@@ -5,9 +5,11 @@
 /.#Makefile
 /.#README.md
 /.gitignore~
+/afile.txt
 /any.sh
 /archive
 /bin
+/bst_tk_standalone
 /build
 /core
 /cscope.files
