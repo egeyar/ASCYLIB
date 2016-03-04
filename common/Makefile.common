@@ -68,6 +68,10 @@ ifeq ($(LOCK),)
   LOCK          ?= TAS
 endif
 
+ifeq ($(LOCK),TSX)
+  CFLAGS        += -mrtm
+endif
+
 ifeq ($(STM),SEQUENTIAL)
   CFLAGS	+= -DSEQUENTIAL
 endif
