@@ -145,6 +145,7 @@ ifeq ($(PC_NAME), lpd48core)
     CFLAGS += -DOPTERON -DPLATFORM_MCORE 
     PLATFORM_NUMA = 1
 endif
+
 ifeq ($(PC_NAME), lpdxeon2680)
     PLATFORM_KNOWN = 1
     CFLAGS += -DLPDXEON -DPLATFORM_MCORE
@@ -154,6 +155,12 @@ endif
 ifeq ($(PC_NAME), lpdpc34)
     PLATFORM_KNOWN = 1
     CFLAGS += -DHASWELL 
+    PLATFORM_NUMA = 0
+endif
+
+ifeq ($(PC_NAME), lpdquad)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DHASWELLQUAD -std=gnu89
     PLATFORM_NUMA = 0
 endif
 
