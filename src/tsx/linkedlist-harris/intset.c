@@ -114,7 +114,7 @@ set_remove(intset_t *set, skey_t key)
       prev->next = next->next;
       free(next);
     }
-#elif defined LOCKFREE
+#else
   result = harris_delete(set, key);
 #endif
 	
