@@ -22,6 +22,7 @@
  *
  */
 
+#include <immintrin.h>
 #include "harris.h"
 
 RETRY_STATS_VARS;
@@ -213,7 +214,7 @@ harris_insert(intset_t *set, skey_t key, sval_t val)
  * or does nothing (if the value is already present).
  * The deletion is logical and consists of setting the node mark bit to 1.
  */
-sval_t
+inline sval_t
 harris_delete(intset_t *set, skey_t key)
 {
   node_t *right_node, *right_node_next, *left_node;
@@ -229,15 +230,59 @@ harris_delete(intset_t *set, skey_t key)
 	  return 0;
 	}
       right_node_next = right_node->next;
+
       if (!is_marked_ref((long) right_node_next))
         {
-	  if (ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
+          long status;
+          int _xbegin_tries = 3;
+          int t;
+          /*Try transactionalization*/
+          for (t = 0; t < _xbegin_tries; t++)
+            {
+              if ((status = _xbegin()) == _XBEGIN_STARTED)
+                {
+                  /*Check compare-condition of the CAS*/
+                  if (right_node->next != right_node_next || left_node->next != right_node)
+                    {
+                      _xabort(0xff);
+                      continue;
+                    }
+                  /*Swap*/
+                  right_node->next = (void*) get_marked_ref((long) right_node_next);
+                  left_node->next = right_node_next;
+                  ret = right_node->val;
+                  _xend();
+                  ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
+                  return ret;
+                }
+              else
+                {
+                  if (status & _XABORT_EXPLICIT)
+                    {
+                      t = _xbegin_tries;
+                      break;
+                    }
+                  pause_rep((1<<(t+1)) & 255);
+                }
+            }
+          /*The fallback path*/
+	  if (t == _xbegin_tries && ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
 	    {
 	      ret = right_node->val;
-	      break;
+              if (likely(ATOMIC_CAS_MB(&left_node->next, right_node, right_node_next)))
+                {
+#if GC == 1
+                  ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
+#endif
+                }
+              else
+                {
+                  harris_search(set, key, &left_node);
+                }
+	      return ret;
 	    }
 	}
-    } 
+    }
   while(1);
 
   if (likely(ATOMIC_CAS_MB(&left_node->next, right_node, right_node_next)))
