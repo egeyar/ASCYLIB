@@ -68,24 +68,34 @@ static inline int
 tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 {
   uint16_t version = tl_old->lr[right].version;
-  if (unlikely(version != tl_old->lr[right].ticket))
+  int _xbegin_tries = 3;
+  int t;
+  for (t = 0; t < _xbegin_tries; t++)
+  {
+    long status;
+    if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      return 0;
+      if (unlikely(tl->lr[right].ticket != version))
+      {
+        _xabort(0xff);
+      }
+      //tl->lr[right].version = version;
+      tl->lr[right].ticket = version+1;
+      _xend();
+      return 1;
     }
-
-#if __GNUC__ >= 5 //stackoverflow.com/questions/13746033
-  tl32_t tlo = {{ .version = version, .ticket = version }};
-  tl32_t tln = {{ .version = version, .ticket = (version + 1) }};
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
-#elif __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
-  tl32_t tlo = { .version = version, .ticket = version };
-  tl32_t tln = { .version = version, .ticket = (version + 1) };
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
-#else
-  tl32_t tlo = { version, version };
-  tl32_t tln = { version, (version + 1) };
-#endif
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
+    else
+    {
+      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      {
+        /*Transactionalization failed.*/
+        break;
+      }
+      PAUSE;
+    }
+  }
+  /*Transactionalization failed.*/
+  return 0;
 }
 
 #define TLN_REMOVED  0x0000FFFF0000FFFF0000LL
@@ -95,24 +105,34 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
 {
   uint16_t v0 = tl_old->lr[0].version;
   uint16_t v1 = tl_old->lr[1].version;
-  if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
+  int _xbegin_tries = 3;
+  int t;
+  for (t = 0; t < _xbegin_tries; t++)
+  {
+    long status;
+    if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      return 0;
+      if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
+      {
+        _xabort(0xff);
+      }
+      tl->to_uint64 = TLN_REMOVED;
+      _xend();
+      return 1;
     }
-
-#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
-  tl_t tlo = { .to_uint64 = tl_old->to_uint64 };
-  return CAS_U64(&tl->to_uint64, tlo.to_uint64, TLN_REMOVED) == tlo.to_uint64;
-#else
-  /* tl_t tlo; */
-  /* tlo.uint64_t = tl_old->to_uint64; */
-  uint64_t tlo = *(uint64_t*) tl_old;
-
-  return CAS_U64((uint64_t*) tl, tlo, TLN_REMOVED) == tlo;
-#endif
-
+    else
+    {
+      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      {
+        /*Transactionalization failed.*/
+        break;
+      }
+      PAUSE;
+    }
+  }
+  /*Transactionalization of the CAS failed. Apply actual CAS*/
+  return 0;
 }
-
 
 static inline void
 tl_unlock(volatile tl_t* tl, int right)
