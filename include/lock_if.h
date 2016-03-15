@@ -261,23 +261,23 @@ ttas_unlock(ptlock_t* l)
 #  define EVALUATE2(sz) PASTER2(CAS_U, sz)
 #  define CAS_UTYPE EVALUATE2(PTLOCK_SIZE)
 typedef volatile UTYPE ptlock_t;
-#  define INIT_LOCK(lock)                               tas_init_tsx(lock)
+#  define INIT_LOCK(lock)                               tsx_init(lock)
 #  define DESTROY_LOCK(lock)                    
-#  define LOCK(lock)                                    tas_lock_tsx(lock)
-#  define TRYLOCK(lock)                                 tas_trylock_tsx(lock)
-#  define UNLOCK(lock)                                  tas_unlock_tsx(lock)
+#  define LOCK(lock)                                    tsx_lock(lock)
+#  define TRYLOCK(lock)                                 
+#  define UNLOCK(lock)                                  tsx_unlock(lock)
 /* GLOBAL lock */
-#  define GL_INIT_LOCK(lock)                            tas_init_tsx(lock)
+#  define GL_INIT_LOCK(lock)                            tsx_init(lock)
 #  define GL_DESTROY_LOCK(lock)                 
-#  define GL_LOCK(lock)                                 tas_lock_tsx(lock)
-#  define GL_TRYLOCK(lock)                              tas_trylock_tsx(lock)
-#  define GL_UNLOCK(lock)                               tas_unlock_tsx(lock)
+#  define GL_LOCK(lock)                                 tsx_lock(lock)
+#  define GL_TRYLOCK(lock)
+#  define GL_UNLOCK(lock)                               tsx_unlock(lock)
 
 #  define TAS_FREE 0
 #  define TAS_LCKD 1
 
 static inline void
-tas_init_tsx(ptlock_t* l)
+tsx_init(ptlock_t* l)
 {
   *l = TAS_FREE;
 #if defined(__tile__)
@@ -286,7 +286,39 @@ tas_init_tsx(ptlock_t* l)
 }
 
 static inline uint32_t
-tas_lock_tsx(ptlock_t* l)
+tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newValue)
+{
+  int _xbegin_tries = 3;
+  int t;
+  for (t = 0; t < _xbegin_tries; t++)
+  {
+    long status;
+    if ((status = _xbegin()) == _XBEGIN_STARTED)
+    {
+      if (*addr != oldValue)
+      {
+        _xabort(0xff);
+      }
+      *addr = newValue;
+      _xend();
+      return 1;
+    }
+    else
+    {
+      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      {
+        /*Transactionalization of the CAS failed.*/
+        break;
+      }
+      PAUSE;
+    }
+  }
+  /*Transactionalization of the CAS failed. Apply actual CAS*/
+  return ATOMIC_CAS_MB(addr, oldValue, newValue);
+}
+
+static inline uint32_t
+tsx_lock(ptlock_t* l)
 {
   int _xbegin_tries = 3;
   int t;
@@ -308,7 +340,7 @@ tas_lock_tsx(ptlock_t* l)
     }
     else
     {
-      if (status & _XABORT_EXPLICIT)
+      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
       {
         break;
       }
@@ -325,13 +357,7 @@ tas_lock_tsx(ptlock_t* l)
 }
 
 static inline uint32_t
-tas_trylock_tsx(ptlock_t* l)
-{
-  return (CAS_UTYPE(l, TAS_FREE, TAS_LCKD) == TAS_FREE);
-}
-
-static inline uint32_t
-tas_unlock_tsx(ptlock_t* l)
+tsx_unlock(ptlock_t* l)
 {
   if (*l == TAS_FREE)
   {
