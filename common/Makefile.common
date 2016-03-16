@@ -160,7 +160,7 @@ endif
 
 ifeq ($(PC_NAME), lpdquad)
     PLATFORM_KNOWN = 1
-    CFLAGS += -DHASWELLQUAD -std=gnu89
+    CFLAGS += -DHASWELLQUAD -fgnu89-inline
     PLATFORM_NUMA = 0
 endif
 
