@@ -67,7 +67,6 @@ typedef union tl
 static inline int
 tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 {
-  uint16_t version = tl_old->lr[right].version;
   int _xbegin_tries = 3;
   int t;
   for (t = 0; t < _xbegin_tries; t++)
@@ -75,26 +74,27 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
     long status;
     if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      if (unlikely(tl->lr[right].ticket != version))
+      if (likely(tl->lr[right].ticket == tl_old->lr[right].version))
+      {
+        tl->lr[right].ticket++;
+        _xend();
+        return 1;
+      }
+      else
       {
         _xabort(0xff);
       }
-      //tl->lr[right].version = version;
-      tl->lr[right].ticket = version+1;
-      _xend();
-      return 1;
     }
+    /*Transactionalization failed.*/
     else
     {
       if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
       {
-        /*Transactionalization failed.*/
         break;
       }
       PAUSE;
     }
   }
-  /*Transactionalization failed.*/
   return 0;
 }
 
@@ -103,8 +103,6 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 static inline int
 tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
 {
-  uint16_t v0 = tl_old->lr[0].version;
-  uint16_t v1 = tl_old->lr[1].version;
   int _xbegin_tries = 3;
   int t;
   for (t = 0; t < _xbegin_tries; t++)
@@ -112,25 +110,28 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
     long status;
     if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
+      if (likely(tl_old->lr[0].version == tl->lr[0].ticket 
+              && tl_old->lr[1].version == tl->lr[1].ticket))
+      {
+        tl->to_uint64 = TLN_REMOVED;
+        _xend();
+        return 1;
+      }
+      else
       {
         _xabort(0xff);
       }
-      tl->to_uint64 = TLN_REMOVED;
-      _xend();
-      return 1;
     }
+    /*Transactionalization failed.*/
     else
     {
       if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
       {
-        /*Transactionalization failed.*/
         break;
       }
       PAUSE;
     }
   }
-  /*Transactionalization of the CAS failed. Apply actual CAS*/
   return 0;
 }
 

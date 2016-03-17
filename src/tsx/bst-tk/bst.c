@@ -132,7 +132,4 @@ set_size(intset_t* set)
   int size = node_size(set->head) - 2;
   return size;
 }
-
-
-
 	
