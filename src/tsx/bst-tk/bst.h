@@ -88,14 +88,34 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
     /*Transactionalization failed.*/
     else
     {
-      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      if (status & _XABORT_EXPLICIT) 
+      {
+        return 0;
+      }
+      if (!(status & _XABORT_RETRY))
       {
         break;
       }
       PAUSE;
     }
   }
-  return 0;
+
+  /*Transactionalization is failed*/
+  uint16_t version = tl_old->lr[right].version;
+
+#if __GNUC__ >= 5 //stackoverflow.com/questions/13746033
+  tl32_t tlo = {{ .version = version, .ticket = version }};
+  tl32_t tln = {{ .version = version, .ticket = (version + 1) }};
+  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
+#elif __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+  tl32_t tlo = { .version = version, .ticket = version };
+  tl32_t tln = { .version = version, .ticket = (version + 1) };
+  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
+#else
+  tl32_t tlo = { version, version };
+  tl32_t tln = { version, (version + 1) };
+#endif
+  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
 }
 
 #define TLN_REMOVED  0x0000FFFF0000FFFF0000LL
@@ -125,14 +145,29 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
     /*Transactionalization failed.*/
     else
     {
-      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      if (status & _XABORT_EXPLICIT)
+      {
+        return 0;
+      }
+      if (!(status & _XABORT_RETRY))
       {
         break;
       }
       PAUSE;
     }
   }
-  return 0;
+
+  /*Transactionalization is failed*/
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+  tl_t tlo = { .to_uint64 = tl_old->to_uint64 };
+  return CAS_U64(&tl->to_uint64, tlo.to_uint64, TLN_REMOVED) == tlo.to_uint64;
+#else
+  /* tl_t tlo; */
+  /* tlo.uint64_t = tl_old->to_uint64; */
+  uint64_t tlo = *(uint64_t*) tl_old;
+
+  return CAS_U64((uint64_t*) tl, tlo, TLN_REMOVED) == tlo;
+#endif
 }
 
 static inline void
