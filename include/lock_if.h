@@ -305,9 +305,12 @@ tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newVal
     }
     else
     {
-      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
+      if (status & _XABORT_EXPLICIT)
       {
-        /*Transactionalization of the CAS failed.*/
+        return 0;
+      }
+      if (!(status & _XABORT_RETRY))
+      {
         break;
       }
       PAUSE;
