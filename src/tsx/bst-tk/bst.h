@@ -74,7 +74,8 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
     long status;
     if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      if (likely(tl->lr[right].ticket == tl_old->lr[right].version))
+      if (likely(tl_old->lr[right].ticket == tl_old->lr[right].version
+              && tl->lr[right].to_uint32 == tl_old->lr[right].to_uint32))
       {
         tl->lr[right].ticket++;
         _xend();
@@ -122,7 +123,7 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 
 static inline int
 tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
-{
+{/*
   int _xbegin_tries = 3;
   int t;
   for (t = 0; t < _xbegin_tries; t++)
@@ -130,8 +131,9 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
     long status;
     if ((status = _xbegin()) == _XBEGIN_STARTED)
     {
-      if (likely(tl_old->lr[0].version == tl->lr[0].ticket 
-              && tl_old->lr[1].version == tl->lr[1].ticket))
+      if (likely(tl_old->lr[0].version == tl_old->lr[0].ticket 
+              && tl_old->lr[1].version == tl_old->lr[1].ticket
+              && tl->to_uint64 == tl_old->to_uint64))
       {
         tl->to_uint64 = TLN_REMOVED;
         _xend();
@@ -143,7 +145,7 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
       }
     }
     /*Transactionalization failed.*/
-    else
+/*    else
     {
       if (status & _XABORT_EXPLICIT)
       {
@@ -158,6 +160,10 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
   }
 
   /*Transactionalization is failed*/
+  uint16_t v0 = tl_old->lr[0].version;
+  uint16_t v1 = tl_old->lr[1].version;
+  if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
+    return 0;
 #if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
   tl_t tlo = { .to_uint64 = tl_old->to_uint64 };
   return CAS_U64(&tl->to_uint64, tlo.to_uint64, TLN_REMOVED) == tlo.to_uint64;
