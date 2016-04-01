@@ -27,9 +27,7 @@
 #define _H_LAZY_
 #include "linkedlist-lock.h"
 
-
 #define LAZY_RO_FAIL RO_FAIL
-
 
 /* linked list accesses */
 extern int parse_validate(node_l_t* pred, node_l_t* curr);

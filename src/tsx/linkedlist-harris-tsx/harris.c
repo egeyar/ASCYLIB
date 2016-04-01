@@ -26,6 +26,7 @@
 #include "harris.h"
 
 RETRY_STATS_VARS;
+TSX_STATS_VARS;
 
 /*
  * The five following functions handle the low-order mark bit that indicates
@@ -233,38 +234,23 @@ harris_delete(intset_t *set, skey_t key)
 
       if (!is_marked_ref((long) right_node_next))
         {
-          long status;
-          int _xbegin_tries = 3;
-          int t;
-          /*Try transactionalization*/
-          for (t = 0; t < _xbegin_tries; t++)
+
+          TSX_CRITICAL_SECTION
             {
-              if ((status = _xbegin()) == _XBEGIN_STARTED)
+              if (right_node->next != right_node_next || left_node->next != right_node)
                 {
-                  /*Check compare-condition of the CAS*/
-                  if (right_node->next != right_node_next || left_node->next != right_node)
-                    {
-                      _xabort(0xff);
-                      continue;
-                    }
-                  /*Swap*/
-                  right_node->next = (void*) get_marked_ref((long) right_node_next);
-                  left_node->next = right_node_next;
-                  ret = right_node->val;
-                  _xend();
-                  ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
-                  return ret;
+                  TSX_ABORT;
                 }
-              else
-                {
-                  if (status & _XABORT_EXPLICIT)
-                    {
-                      t = _xbegin_tries;
-                      break;
-                    }
-                  pause_rep((1<<(t+1)) & 255);
-                }
+              /*Swap*/
+              right_node->next = (void*) get_marked_ref((long) right_node_next);
+              left_node->next = right_node_next;
+              ret = right_node->val;
+              TSX_COMMIT;
+              ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
+              return ret;
             }
+          TSX_AFTER
+
           /*The fallback path*/
 	  if (t == _xbegin_tries && ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
 	    {

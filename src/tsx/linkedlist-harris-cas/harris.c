@@ -25,6 +25,7 @@
 #include "harris.h"
 
 RETRY_STATS_VARS;
+TSX_STATS_VARS;
 
 /*
  * The five following functions handle the low-order mark bit that indicates

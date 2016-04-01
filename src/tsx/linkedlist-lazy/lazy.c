@@ -26,11 +26,13 @@
 #include "lazy.h"
 
 RETRY_STATS_VARS;
+TSX_STATS_VARS;
 
 /*
  * Checking that both curr and pred are both unmarked and that pred's next pointer
  * points to curr to verify that the entries are adjacent and present in the list.
  */
+
 inline int
 parse_validate(node_l_t* pred, node_l_t* curr) 
 {
