@@ -37,6 +37,7 @@
 
 #include <atomic_ops.h>
 #include "atomic_ops_if.h"
+#include "lock_if.h"
 
 #include "common.h"
 #include "utils.h"

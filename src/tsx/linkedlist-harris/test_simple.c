@@ -149,12 +149,6 @@ test(void* thread)
   volatile ticks my_removing_fail = 0;
 #endif
 
-#if defined(TSX)
-  //extern volatile ticks my_tsx_trials;
-  //extern volatile ticks my_tsx_commits;
-  //extern volatile ticks my_tsx_aborts;
-#endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;

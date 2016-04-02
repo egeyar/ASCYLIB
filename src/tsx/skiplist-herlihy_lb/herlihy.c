@@ -30,6 +30,7 @@
 #include "utils.h"
 
 RETRY_STATS_VARS;
+TSX_STATS_VARS;
 
 #include "latency.h"
 #if LATENCY_PARSING == 1

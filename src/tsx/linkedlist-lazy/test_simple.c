@@ -150,12 +150,6 @@ test(void* thread)
   volatile ticks my_removing_fail = 0;
 #endif
 
-#if defined(TSX)
-  //extern volatile ticks my_tsx_trials;
-  //extern volatile ticks my_tsx_commits;
-  //extern volatile ticks my_tsx_aborts;
-#endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;
@@ -616,7 +610,7 @@ main(int argc, char **argv)
   printf("#Mops %.3f\n", throughput / 1e6);
 
   RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
-  RR_PRINT_CORRECTED();    
+  RR_PRINT_CORRECTED();
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
 
   pthread_exit(NULL);
