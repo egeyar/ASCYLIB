@@ -102,6 +102,11 @@ volatile ticks *getting_count_succ;
 volatile ticks *removing_count;
 volatile ticks *removing_count_succ;
 volatile ticks *total;
+#if defined(TSX)
+volatile ticks *tsx_trials;
+volatile ticks *tsx_commits;
+volatile ticks *tsx_aborts[3];
+#endif
 
 
 /* ################################################################### *
@@ -181,7 +186,7 @@ test(void* thread)
 #if INITIALIZE_FROM_ONE == 1
   num_elems_thread = (ID == 0) * initial;
 #endif
-    
+
   for(i = 0; i < num_elems_thread; i++) 
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
@@ -228,6 +233,14 @@ test(void* thread)
   removing_succ[ID] += my_removing_succ;
   removing_fail[ID] += my_removing_fail;
 #endif
+#if defined(TSX)
+  tsx_trials[ID] += my_tsx_trials;
+  tsx_commits[ID] += my_tsx_commits;
+  tsx_aborts[0][ID] += my_tsx_aborts[0];
+  tsx_aborts[1][ID] += my_tsx_aborts[1];
+  tsx_aborts[2][ID] += my_tsx_aborts[2];
+#endif
+
   putting_count[ID] += my_putting_count;
   getting_count[ID] += my_getting_count;
   removing_count[ID]+= my_removing_count;
@@ -438,7 +451,14 @@ main(int argc, char **argv)
   getting_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
-    
+#if defined(TSX)
+  tsx_trials = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_commits = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[0] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[1] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[2] = (ticks *) calloc(num_threads, sizeof(ticks));
+#endif
+
   pthread_t threads[num_threads];
   pthread_attr_t attr;
   int rc;
@@ -505,6 +525,11 @@ main(int argc, char **argv)
   volatile uint64_t getting_count_total_succ = 0;
   volatile uint64_t removing_count_total = 0;
   volatile uint64_t removing_count_total_succ = 0;
+#if defined(TSX)
+  volatile uint64_t tsx_trials_total = 0;
+  volatile uint64_t tsx_commits_total = 0;
+  volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
+#endif
     
   for(t=0; t < num_threads; t++) 
     {
@@ -521,6 +546,13 @@ main(int argc, char **argv)
       getting_count_total_succ += getting_count_succ[t];
       removing_count_total += removing_count[t];
       removing_count_total_succ += removing_count_succ[t];
+#if defined(TSX)
+      tsx_trials_total += tsx_trials[t];
+      tsx_commits_total += tsx_commits[t];
+      tsx_aborts_total[0] += tsx_aborts[0][t];
+      tsx_aborts_total[1] += tsx_aborts[1][t];
+      tsx_aborts_total[2] += tsx_aborts[2][t];
+#endif
     }
 
 #if defined(COMPUTE_LATENCY)
@@ -532,6 +564,11 @@ main(int argc, char **argv)
   long unsigned rem_suc = removing_count_total_succ ? removing_suc_total / removing_count_total_succ : 0;
   long unsigned rem_fal = (removing_count_total - removing_count_total_succ) ? removing_fal_total / (removing_count_total - removing_count_total_succ) : 0;
   printf("%-7zu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu\n", num_threads, get_suc, get_fal, put_suc, put_fal, rem_suc, rem_fal);
+#endif
+#if defined(TSX)
+  printf("#thread tsx_trials tsx_commits tsx_1st_aborts tsx_2nd_aborts tsx_3rd_aborts  ##invocations\n"); fflush(stdout);
+  printf("%-7zu %-8lu   %-8lu    %-8lu       %-8lu       %-8lu\n", 
+         num_threads, tsx_trials_total, tsx_commits_total, tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);
 #endif
     
 #define LLU long long unsigned int
@@ -563,7 +600,7 @@ main(int argc, char **argv)
   printf("#Mops %.3f\n", throughput / 1e6);
 
   RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
-  RR_PRINT_CORRECTED();    
+  RR_PRINT_CORRECTED();
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
 
   pthread_exit(NULL);

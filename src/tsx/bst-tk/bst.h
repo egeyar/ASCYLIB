@@ -67,41 +67,22 @@ typedef union tl
 static inline int
 tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 {
-  int _xbegin_tries = 3;
-  int t;
-  for (t = 0; t < _xbegin_tries; t++)
-  {
-    long status;
-    if ((status = _xbegin()) == _XBEGIN_STARTED)
+  TSX_CRITICAL_SECTION
     {
       if (likely(tl_old->lr[right].ticket == tl_old->lr[right].version
               && tl->lr[right].to_uint32 == tl_old->lr[right].to_uint32))
       {
         tl->lr[right].ticket++;
-        _xend();
+        TSX_COMMIT;
         return 1;
       }
       else
       {
-        _xabort(0xff);
+        TSX_ABORT;
       }
     }
-    /*Transactionalization failed.*/
-    else
-    {
-      if (status & _XABORT_EXPLICIT) 
-      {
-        return 0;
-      }
-      if (!(status & _XABORT_RETRY))
-      {
-        break;
-      }
-      PAUSE;
-    }
-  }
+  TSX_AFTER;
 
-  /*Transactionalization is failed*/
   uint16_t version = tl_old->lr[right].version;
 
 #if __GNUC__ >= 5 //stackoverflow.com/questions/13746033
@@ -123,43 +104,24 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 
 static inline int
 tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
-{/*
-  int _xbegin_tries = 3;
-  int t;
-  for (t = 0; t < _xbegin_tries; t++)
-  {
-    long status;
-    if ((status = _xbegin()) == _XBEGIN_STARTED)
+{
+  TSX_CRITICAL_SECTION
     {
       if (likely(tl_old->lr[0].version == tl_old->lr[0].ticket 
               && tl_old->lr[1].version == tl_old->lr[1].ticket
               && tl->to_uint64 == tl_old->to_uint64))
       {
         tl->to_uint64 = TLN_REMOVED;
-        _xend();
+        TSX_COMMIT;
         return 1;
       }
       else
       {
-        _xabort(0xff);
+        TSX_ABORT;
       }
     }
-    /*Transactionalization failed.*/
-/*    else
-    {
-      if (status & _XABORT_EXPLICIT)
-      {
-        return 0;
-      }
-      if (!(status & _XABORT_RETRY))
-      {
-        break;
-      }
-      PAUSE;
-    }
-  }
+  TSX_AFTER;
 
-  /*Transactionalization is failed*/
   uint16_t v0 = tl_old->lr[0].version;
   uint16_t v1 = tl_old->lr[1].version;
   if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
