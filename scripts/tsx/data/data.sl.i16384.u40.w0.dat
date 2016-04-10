@@ -1,0 +1,14 @@
+### params -i16384 -r32768 -u40 / keep median of reps 3 of dur 2000
+# Result from 3 repetitions: median
+#       lpdquadlb-sl_herlihy_0 lpdquadtsx-sl_herlihy_0 lpdquadlf-sl_fraser_0 lpdquadtsx-sl_fraser_cas_0 lpdquadtsx-sl_fraser_tsx_0 
+#cores  throughput   throughput   throughput   throughput   throughput   
+1       3411886      3318692      3173622      3129714      3202432      
+8       14742578     4765852      14265308     7399800      10366685     
+16      28978201     5218262      26274796     8062363      11388208     
+24      39335345     5497277      37999616     8601489      12070624     
+32      51045539     5644468      47626959     8170299      12552554     
+40      59379268     5923290      55227488     9075880      13065903     
+48      67290522     6240967      60729066     9332148      13453536     
+56      74662885     6791331      66024366     9860179      14313620     
+64      71784102     6885414      71962471     9900096      14306716     
+72      85457669     

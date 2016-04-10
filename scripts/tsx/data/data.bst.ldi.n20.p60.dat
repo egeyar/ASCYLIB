@@ -1,0 +1,8 @@
+### params -i65534 -p60 -n20 / dur 1000
+# number of cores: 20
+#././bin/lpdquad/lb-bst_tk                       ./bin/lpdquad/lf-bst_aravind                    ./bin/lpdquad/tsx-bst_tk                        
+ 0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       
+ 0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       
+ 0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       
+ 0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       
+ 0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       0       

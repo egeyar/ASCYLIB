@@ -333,6 +333,10 @@ ifeq ($(SET_CPU),0)
 	CFLAGS += -DNO_SET_CPU
 endif
 
+ifeq ($(TSX_STATS),1)
+	CFLAGS += -DTSX_STATS
+endif
+
 ifeq ($(POWER),1)
 	CFLAGS += -DRAPL_READ_ENABLE=1
 	ifeq ($(PLATFORM_NUMA), 1)
