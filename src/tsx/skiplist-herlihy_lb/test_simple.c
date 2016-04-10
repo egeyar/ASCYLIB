@@ -102,7 +102,7 @@ volatile ticks *getting_count_succ;
 volatile ticks *removing_count;
 volatile ticks *removing_count_succ;
 volatile ticks *total;
-#if defined(TSX)
+#if defined(TSX_STATS)
 volatile ticks *tsx_trials;
 volatile ticks *tsx_commits;
 volatile ticks *tsx_aborts[3];
@@ -148,13 +148,6 @@ test(void* thread)
   volatile ticks my_removing_succ = 0;
   volatile ticks my_removing_fail = 0;
 #endif
-
-#if defined(TSX)
-  //extern volatile ticks my_tsx_trials;
-  //extern volatile ticks my_tsx_commits;
-  //extern volatile ticks my_tsx_aborts;
-#endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;
@@ -242,7 +235,7 @@ test(void* thread)
   removing_succ[ID] += my_removing_succ;
   removing_fail[ID] += my_removing_fail;
 #endif
-#if defined(TSX)
+#if defined(TSX_STATS)
   tsx_trials[ID] += my_tsx_trials;
   tsx_commits[ID] += my_tsx_commits;
   tsx_aborts[0][ID] += my_tsx_aborts[0];
@@ -461,7 +454,7 @@ main(int argc, char **argv)
   getting_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
-#if defined(TSX)
+#if defined(TSX_STATS)
   tsx_trials = (ticks *) calloc(num_threads, sizeof(ticks));
   tsx_commits = (ticks *) calloc(num_threads, sizeof(ticks));
   tsx_aborts[0] = (ticks *) calloc(num_threads, sizeof(ticks));
@@ -532,7 +525,7 @@ main(int argc, char **argv)
   volatile uint64_t getting_count_total_succ = 0;
   volatile uint64_t removing_count_total = 0;
   volatile uint64_t removing_count_total_succ = 0;
-#if defined(TSX)
+#if defined(TSX_STATS)
   volatile uint64_t tsx_trials_total = 0;
   volatile uint64_t tsx_commits_total = 0;
   volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
@@ -553,7 +546,7 @@ main(int argc, char **argv)
       getting_count_total_succ += getting_count_succ[t];
       removing_count_total += removing_count[t];
       removing_count_total_succ += removing_count_succ[t];
-#if defined(TSX)
+#if defined(TSX_STATS)
       tsx_trials_total += tsx_trials[t];
       tsx_commits_total += tsx_commits[t];
       tsx_aborts_total[0] += tsx_aborts[0][t];
@@ -572,7 +565,7 @@ main(int argc, char **argv)
   long unsigned rem_fal = (removing_count_total - removing_count_total_succ) ? removing_fal_total / (removing_count_total - removing_count_total_succ) : 0;
   printf("%-7zu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu\n", num_threads, get_suc, get_fal, put_suc, put_fal, rem_suc, rem_fal);
 #endif
-#if defined(TSX)
+#if defined(TSX_STATS)
   printf("#thread tsx_trials tsx_commits tsx_1st_aborts tsx_2nd_aborts tsx_3rd_aborts  ##invocations\n"); fflush(stdout);
   printf("%-7zu %-8lu   %-8lu    %-8lu       %-8lu       %-8lu\n", 
          num_threads, tsx_trials_total, tsx_commits_total, tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);

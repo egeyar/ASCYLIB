@@ -31,10 +31,12 @@ then
 elif [ $1 = "ol-collab1" ];
 then
 	echo 256;
+elif [ $1 = "lpdquad" ];
+then
+	echo 96;
 else
 	echo 48;
 fi;
-
 }
 
 if [ $unm = "maglite" ];
@@ -61,6 +63,9 @@ then
 elif [ $unm = "ol-collab1" ];
 then
 	max_cores=256;
+elif [ $unm = "lpdquad" ];
+then
+	max_cores=96;
 else
 	max_cores=48;
 fi;
@@ -128,7 +133,7 @@ then
 	cores="$(seq 2 2 48) $(seq 52 4 64)";
     elif [ $unm = "lpdquad" ];
     then
-	cores="$(seq 2 4 96) $(seq 104 8 164)";
+	cores="$(seq 8 8 96)";
     elif [ $unm = "ol-collab1" ];
     then
 	cores="2 $(seq 8 8 256) 288 320 352";

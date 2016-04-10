@@ -25,7 +25,9 @@
 #include "bst_tk.h"
 
 RETRY_STATS_VARS;
+#ifdef TSX_STATS
 TSX_STATS_VARS;
+#endif
 
 sval_t
 bst_tk_delete(intset_t* set, skey_t key)

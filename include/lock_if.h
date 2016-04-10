@@ -276,15 +276,16 @@ typedef volatile UTYPE ptlock_t;
 #  define TAS_FREE 0
 #  define TAS_LCKD 1
 
-# define TSX_STATS_VARS \
+#  ifdef TSX_STATS
+#    define TSX_STATS_VARS \
 volatile ticks my_tsx_trials=0, my_tsx_commits=0, \
          my_tsx_aborts[3] = {0, 0, 0}
-# define EXTERN_TSX_STATS_VARS \
+#    define EXTERN_TSX_STATS_VARS \
 extern volatile ticks my_tsx_trials, my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
-#  define TSX_CRITICAL_SECTION                 \
+#    define TSX_CRITICAL_SECTION               \
 long status;                                   \
 int _xbegin_tries = 3;                         \
 int t;                                         \
@@ -293,7 +294,7 @@ for (t = 0; t < _xbegin_tries; t++)            \
 {                                              \
   if ((status = _xbegin()) == _XBEGIN_STARTED)
 
-#define TSX_AFTER                              \
+#    define TSX_AFTER                          \
   else                                         \
   {                                            \
     my_tsx_aborts[t]++;                        \
@@ -305,17 +306,41 @@ for (t = 0; t < _xbegin_tries; t++)            \
   pause_rep((1<<(t+1)) & 255);                 \
   }                                            \
 }
+#    define TSX_ABORT  _xabort(0xff);
+#    define TSX_COMMIT _xend(); my_tsx_commits++;
 
-#define TSX_ABORT  _xabort(0xff);
-#define TSX_COMMIT _xend(); my_tsx_commits++;
+
+#  else // ifndef TSX_STATS
+#    define TSX_CRITICAL_SECTION               \
+long status;                                   \
+int _xbegin_tries = 3;                         \
+int t;                                         \
+for (t = 0; t < _xbegin_tries; t++)            \
+{                                              \
+  if ((status = _xbegin()) == _XBEGIN_STARTED)
+
+#    define TSX_AFTER                          \
+  else                                         \
+  {                                            \
+    if (status & _XABORT_EXPLICIT)             \
+    {                                          \
+      t = _xbegin_tries;                       \
+      break;                                   \
+    }                                          \
+  pause_rep((1<<(t+1)) & 255);                 \
+  }                                            \
+}
+#    define TSX_ABORT  _xabort(0xff);
+#    define TSX_COMMIT _xend();
+#  endif
 
 static inline void
 tsx_init(ptlock_t* l)
 {
   *l = TAS_FREE;
-#if defined(__tile__)
+#  if defined(__tile__)
   MEM_BARRIER;
-#endif
+#  endif
 }
 
 static inline uint32_t
@@ -323,7 +348,9 @@ tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newVal
 {
   int _xbegin_tries = 3;
   int t;
+#  ifdef TSX_STATS
   my_tsx_trials++;
+#  endif
   for (t = 0; t < _xbegin_tries; t++)
   {
     long status;
@@ -335,12 +362,16 @@ tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newVal
       }
       *addr = newValue;
       _xend();
+#  ifdef TSX_STATS
       my_tsx_commits++;
+#  endif
       return 1;
     }
     else
     {
+#  ifdef TSX_STATS
       my_tsx_aborts[t]++;
+#  endif
       if (status & _XABORT_EXPLICIT)
       {
         return 0;
@@ -361,7 +392,9 @@ tsx_lock(ptlock_t* l)
 {
   int _xbegin_tries = 3;
   int t;
+#  ifdef TSX_STATS
   my_tsx_trials++;
+#  endif
   for (t = 0; t < _xbegin_tries; t++)
   {
     while (*l != TAS_FREE)
@@ -379,7 +412,9 @@ tsx_lock(ptlock_t* l)
     }
     else
     {
+#  ifdef TSX_STATS
       my_tsx_aborts[t]++;
+#  endif
       if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
       {
         break;
@@ -402,7 +437,9 @@ tsx_unlock(ptlock_t* l)
   if (*l == TAS_FREE)
   {
     _xend();
+#  ifdef TSX_STATS
     my_tsx_commits++;
+#  endif
   }
   else
   {
