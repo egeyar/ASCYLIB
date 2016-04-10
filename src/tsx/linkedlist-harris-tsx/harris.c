@@ -254,7 +254,7 @@ harris_delete(intset_t *set, skey_t key)
           TSX_AFTER
 
           /*The fallback path*/
-	  if (t == _xbegin_tries && ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
+	  if (t == TSX_TRIES && ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
 	    {
 	      ret = right_node->val;
               if (likely(ATOMIC_CAS_MB(&left_node->next, right_node, right_node_next)))
