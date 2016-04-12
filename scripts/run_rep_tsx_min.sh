@@ -4,8 +4,8 @@ source scripts/config;
 
 reps=$1;
 shift;
-stat=$1;
-shift
+#stat=$1;
+#shift
 prog="$1";
 shift;
 params="$@";
@@ -16,7 +16,7 @@ printf "" > $tmp;
 
 for r in $(seq 1 1 $reps);
 do
-    $run_script ./$prog $params | grep "$stat" | cut -d':' -f2 >> $tmp;
+    $run_script ./$prog $params | grep "tsx stats" | cut -d':' -f2 >> $tmp;
 done;
 
 HEAD=head;

@@ -12,18 +12,18 @@ then
     . $file;
     skip=0;
 else
-. ./scripts/tsx/run.config.fast;
+. ./scripts/tsx/run.config;
 fi;
 
 do_thr=1;
-do_ldi=1;
+do_ldi=0;
 
 
-algos=( ./${ub}/lb-bst_tk ${ub}/lf-bst_aravind ${ub}/tsx-bst_tk );
+algos=( ./${ub}/tsx-bst_tk );
 
 param_i=65534;
 params_p=( 40 50 60 );
-params_nc=( 10 20 );		# for latency ditribution
+params_nc=( 10 20 );		# for latency distribution
 np=${#params_p[*]};
 
 cores_backup=$cores;
@@ -59,12 +59,11 @@ algos_str="${algos[@]}";
 
 if [ $do_thr -eq 1 ];
 then
-    echo "########################################### Throughput";
 
     if [ $do_compile -eq 1 ];
     then
 	ctarget=tsx${ds};
-	cflags="SET_CPU=$set_cpu";
+	cflags="SET_CPU=$set_cpu TSX_STATS=1";
 	echo "----> Compiling" $ctarget " with flags:" $cflags;
 	make $ctarget $cflags >> /dev/null;
 	if [ $? -eq 0 ];
@@ -86,58 +85,14 @@ then
 	put=${params_p[$i]};
 	if [ $fixed_file_dat -ne 1 ];
 	then
-	    out="$unm.${ds}.thr.p$put.dat"
+	    out="$unm.stats.${ds}.i$initial.p$put.w0.dat"
 	else
-	    out="data.${ds}.thr.p$put.dat"
+	    out="data.stats.${ds}.i$initial.p$put.w0.dat"
 	fi;
 
 	echo "### params -i$initial -p$put / keep $keep of reps $repetitions of dur $duration" | tee ${uo}/$out;
 
-	./scripts/scalability_rep.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -p$put \
+	./scripts/tsx_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -p$put \
 	    | tee -a ${uo}/$out;
     done;
-fi;
-
-if [ $do_ldi -eq 1 ];
-then
-    echo "########################################### Latency distribution";
-
-    if [ $do_compile -eq 1 ];
-    then
-	ctarget=tsx${ds};
-	cflags="SET_CPU=$set_cpu LATENCY=6";
-	echo "----> Compiling" $ctarget " with flags:" $cflags;
-	make $ctarget $cflags >> /dev/null;
-	if [ $? -eq 0 ];
-	then
-	    echo "----> Success!"
-	fi;
-	echo "----> Moving binaries to $ub";
-	mkdir $ub &> /dev/null;
-	mv bin/*${ds}* $ub;
-	if [ $? -eq 0 ];
-	then
-	    echo "----> Success!"
-	fi;
-    fi;
-
-    for ((n=0; n < $nc_ldi; n++))
-    do
-	for ((i=0; i < $np; i++))
-	do
-	    initial=$param_i;
-	    put=${params_p[$i]};
-	    nc=${params_nc[$n]};
-	if [ $fixed_file_dat -ne 1 ];
-	then
-	    out="$unm.${ds}.ldi.n$nc.p$put.dat"
-	else
-	    out="data.${ds}.ldi.n$nc.p$put.dat"
-	fi;
-	    echo "### params -i$initial -p$put -n$nc / dur $duration" | tee ${uo}/$out;
-
-	    ./scripts/scalability_ldi.sh $nc "$algos_str" -d$duration -i$initial -p$put \
-		| tee -a ${uo}/$out;
-	done;
-    done;
-fi;
+fi

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ds=ll;
+ds=ht;
 
 file=$1;
 
@@ -12,15 +12,15 @@ then
     . $file;
     skip=0;
 else
-. ./scripts/tsx/run.config.fast;
+. ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/lb-ll_lazy ${ub}/tsx-ll_harris );
+algos=( ${ub}/lb-ht_lazy ${ub}/lf-ht_harris ${ub}/tsx-ht_lazy );
 
-params_i=( 64 1024 8192 65536 1048576 64 1024 8192 65536 1048576 64 1024 8192 65536 1048576 );
-params_u=( 40 40   40   40    40      20 20   20   20    20      10 10   10   10    10      );
-params_w=( 0   0   0    0     0       0   0   0    0     0       0   0   0    0     0       );
-
+params_i=( 512 8192 65536 512 8192 65536 512 8192 65536 );
+params_u=( 40  40   40    20  20   20    10  10   10    );
+params_w=( 0   0    0     0   0    0     0   0    0     );
+load_factor=1;
 np=${#params_i[*]};
 
 cores_backup=$cores;
@@ -96,12 +96,12 @@ do
 
     if [ $fixed_file_dat -ne 1 ];
     then
-	out="$unm.${ds}.i$initial.u$update.w$workload.dat"
+	out="$unm.thr.${ds}.i$initial.u$update.w$workload.dat"
     else
-	out="data.${ds}.i$initial.u$update.w$workload.dat"
+	out="data.thr.${ds}.i$initial.u$update.w$workload.dat"
     fi;
 
     echo "### params -i$initial -r$range -u$update / keep $keep of reps $repetitions of dur $duration" | tee ${uo}/$out;
-    ./scripts/scalability_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -r$range -u$update \
+    ./scripts/scalability_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -r$range -u$update -l$load_factor \
 				 | tee -a ${uo}/$out;
 done;

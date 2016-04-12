@@ -12,14 +12,14 @@ then
     . $file;
     skip=0;
 else
-. ./scripts/tsx/run.config.fast;
+. ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/lb-sl_herlihy ${ub}/tsx-sl_herlihy ${ub}/lf-sl_fraser ${ub}/tsx-sl_fraser_cas ${ub}/tsx-sl_fraser_tsx );
+algos=( ${ub}/tsx-sl_herlihy ${ub}/tsx-sl_fraser_cas ${ub}/tsx-sl_fraser_tsx );
 
-params_i=( 1024 16384 65536 1048576 33554432 1024 16384 65536 1048576 33554432 1024 16384 65536 1048576 33554432 );
-params_u=( 40   40    40    40      40       20   20    20    20      20       10   10    10    10      10       );
-params_w=( 0    0     0     0       0        0    0     0     0       0        0    0     0     0       0        );
+params_i=( 1024 16384 65536 1024 16384 65536 1024 16384 65536 );
+params_u=( 40   40    40    20   20    20    10   10    10    );
+params_w=( 0    0     0     0    0     0     0    0     0     );
 np=${#params_i[*]};
 
 cores_backup=$cores;
@@ -51,7 +51,7 @@ then
     ctarget=tsx${ds};
     for WORKLOAD in 0 2;
     do
-	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD";
+	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD TSX_STATS=1";
 	echo "----> Compiling" $ctarget " with flags:" $cflags;
 	make $ctarget $cflags >> /dev/null;
 	if [ $? -eq 0 ];
@@ -95,12 +95,12 @@ do
 
     if [ $fixed_file_dat -ne 1 ];
     then
-	out="$unm.${ds}.i$initial.u$update.w$workload.dat"
+	out="$unm.stats.${ds}.i$initial.u$update.w$workload.dat"
     else
-	out="data.${ds}.i$initial.u$update.w$workload.dat"
+	out="data.stats.${ds}.i$initial.u$update.w$workload.dat"
     fi;
 
     echo "### params -i$initial -r$range -u$update / keep $keep of reps $repetitions of dur $duration" | tee ${uo}/$out;
-    ./scripts/scalability_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -r$range -u$update \
+    ./scripts/tsx_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -r$range -u$update \
 				 | tee -a ${uo}/$out;
 done;
