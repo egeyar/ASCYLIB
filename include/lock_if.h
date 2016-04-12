@@ -280,11 +280,11 @@ typedef volatile UTYPE ptlock_t;
 
 #  ifdef TSX_STATS
 #    define TSX_STATS_VARS \
-volatile ticks my_tsx_trials[3] = {0, 0, 0},   \
+__thread ticks my_tsx_trials[3] = {0, 0, 0},   \
                my_tsx_commits = 0,             \
                my_tsx_aborts[3] = {0, 0, 0}
 #    define EXTERN_TSX_STATS_VARS \
-extern volatile ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
+extern __thread ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
