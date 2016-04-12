@@ -105,6 +105,7 @@ tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 static inline int
 tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
 {
+/*
   TSX_CRITICAL_SECTION
     {
       if (likely(tl_old->lr[0].version == tl_old->lr[0].ticket 
@@ -121,7 +122,7 @@ tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
       }
     }
   TSX_AFTER;
-
+*/
   uint16_t v0 = tl_old->lr[0].version;
   uint16_t v1 = tl_old->lr[1].version;
   if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))

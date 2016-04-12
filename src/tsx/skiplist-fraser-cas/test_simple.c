@@ -573,16 +573,17 @@ main(int argc, char **argv)
   printf("%-7zu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu\n", num_threads, get_suc, get_fal, put_suc, put_fal, rem_suc, rem_fal);
 #endif
 #if defined(TSX_STATS)
-  printf("#tsx_trials_round1 :%lu\n", tsx_trials_total[0]);
-  printf("#tsx_trials_round2 :%lu\n", tsx_trials_total[1]);
-  printf("#tsx_trials_round3 :%lu\n", tsx_trials_total[2]);
-  printf("#tsx_aborts_round1 :%lu\n", tsx_aborts_total[0]);
-  printf("#tsx_aborts_round2 :%lu\n", tsx_aborts_total[1]);
-  printf("#tsx_aborts_round3 :%lu\n", tsx_aborts_total[2]);
-  printf("#tsx_commits       :%f\n", (float)tsx_commits_total/tsx_trials_total[0]);
+  printf("           %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n",
+         "commit_rate", "commits",
+         "trials_rnd1", "trials_rnd2", "trials_rnd3",
+         "aborts_rnd1", "aborts_rnd2", "aborts_rnd3");
+  printf("tsx stats :%-12f %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu\n",
+         (float)tsx_commits_total/tsx_trials_total[0], tsx_commits_total,
+         tsx_trials_total[0], tsx_trials_total[1], tsx_trials_total[2],
+         tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);
   fflush(stdout);
 #endif
-    
+
 #define LLU long long unsigned int
 
   int UNUSED pr = (int) (putting_count_total_succ - removing_count_total_succ);
