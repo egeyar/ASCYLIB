@@ -47,7 +47,7 @@
 #  include <sys/procset.h>
 #endif
 
-#include "hashtable-lock.h"
+#include "intset.h"
 
 /* ################################################################### *
  * Definition of macros: per data structure
@@ -60,7 +60,7 @@
 #define DS_NEW()            ht_new()
 
 #define DS_TYPE             ht_intset_t
-#define DS_NODE             node_l_t
+#define DS_NODE             node_t
 
 /* ################################################################### *
  * GLOBALS
@@ -68,6 +68,7 @@
 
 RETRY_STATS_VARS_GLOBAL;
 
+unsigned int maxhtlength;
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
 size_t load_factor = DEFAULT_LOAD;
@@ -168,6 +169,7 @@ test(void* thread)
   ssmem_alloc_init_fs_size(alloc, SSMEM_DEFAULT_MEM_SIZE, SSMEM_GC_FREE_SET_SIZE, ID);
 #endif
 
+  RR_INIT(phys_id);
   barrier_cross(&barrier);
 
   uint64_t key;
@@ -210,12 +212,15 @@ test(void* thread)
 
   barrier_cross(&barrier_global);
 
+  RR_START_SIMPLE();
+
   while (stop == 0) 
     {
       TEST_LOOP(NULL);
     }
 
   barrier_cross(&barrier);
+  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -242,7 +247,6 @@ test(void* thread)
   tsx_aborts[1][ID] += my_tsx_aborts[1];
   tsx_aborts[2][ID] += my_tsx_aborts[2];
 #endif
-
   putting_count[ID] += my_putting_count;
   getting_count[ID] += my_getting_count;
   removing_count[ID]+= my_removing_count;
@@ -273,8 +277,6 @@ main(int argc, char **argv)
   set_cpu(0);
   ssalloc_init();
   seeds = seed_rand();
-
-  RR_INIT_ALL();
 
   struct option long_options[] = {
     // These options don't set a flag
@@ -328,6 +330,8 @@ main(int argc, char **argv)
 		 "        Range of integer values inserted in set\n"
 		 "  -u, --update-rate <int>\n"
 		 "        Percentage of update transactions\n"
+		 "  -l, --load-factor <int>\n"
+		 "        Elements per bucket\n"
 		 "  -p, --put-rate <int>\n"
 		 "        Percentage of put update transactions (should be less than percentage of updates)\n"
 		 "  -b, --num-buckets <int>\n"
@@ -386,9 +390,7 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Initial: %zu / Range: %zu / Load factor: %zu / ", initial, range, load_factor);
-  printf("\n");
-
+  printf("## Initial: %zu / Range: %zu / Load factor: %zu\n", initial, range, load_factor);
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
   double mb = kb / 1024.0;
@@ -419,12 +421,6 @@ main(int argc, char **argv)
 
   get_rate = 1 - update_rate;
 
-  /* printf("num_threads = %u\n", num_threads); */
-  /* printf("cap: = %u\n", num_buckets); */
-  /* printf("num elem = %u\n", num_elements); */
-  /* printf("filing rate= %f\n", filling_rate); */
-  /* printf("update = %f (putting = %f)\n", update_rate, put_rate); */
-
 
   rand_max = range - 1;
     
@@ -434,9 +430,9 @@ main(int argc, char **argv)
   timeout.tv_nsec = (duration % 1000) * 1000000;
     
   stop = 0;
-    
-  maxhtlength = (unsigned int) initial / load_factor;
 
+  maxhtlength = (unsigned int) initial / load_factor;
+    
   DS_TYPE* set = DS_NEW();
   assert(set != NULL);
 
@@ -496,12 +492,9 @@ main(int argc, char **argv)
     
   barrier_cross(&barrier_global);
   gettimeofday(&start, NULL);
-
-  RR_START_UNPROTECTED_ALL();
   nanosleep(&timeout, NULL);
-  RR_STOP_UNPROTECTED_ALL();
-
   stop = 1;
+
   gettimeofday(&end, NULL);
   duration = (end.tv_sec * 1000 + end.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000);
     

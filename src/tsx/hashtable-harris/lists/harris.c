@@ -2,8 +2,7 @@
  *   File: harris.c
  *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
  *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: Timothy L Harris. A Pragmatic Implementation 
- *   of Non-blocking Linked Lists. DISC 2001.
+ *   Description: 
  *   harris.c is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
@@ -22,13 +21,31 @@
  *
  */
 
-#include <immintrin.h>
-#include "harris.h"
+/*
+ * File:
+ *   harris.c
+ * Author(s):
+ * Description:
+ *   Lock-free linkedlist implementation of Harris' algorithm
+ *   "A Pragmatic Implementation of Non-Blocking Linked Lists" 
+ *   T. Harris, p. 300-314, DISC 2001.
+ *
+ * Copyright (c) 2009-2010.
+ *
+ * harris.c is part of HIDDEN
+ * 
+ * HIDDEN is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation, version 2
+ * of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 
-RETRY_STATS_VARS;
-#ifdef TSX_STATS
-TSX_STATS_VARS;
-#endif
+#include "harris.h"
 
 /*
  * The five following functions handle the low-order mark bit that indicates
@@ -91,7 +108,6 @@ harris_search(intset_t *set, skey_t key, node_t **left_node)
 	
   do
     {
-      PARSE_TRY();
       node_t *t = set->head;
       node_t *t_next = set->head->next;
 		
@@ -126,9 +142,8 @@ harris_search(intset_t *set, skey_t key, node_t **left_node)
 	    }
 	}
 		
-      CLEANUP_TRY();
       /* Remove one or more marked nodes */
-      if (ATOMIC_CAS_MB(&(*left_node)->next, left_node_next, right_node)) 
+      if (ATOMIC_CAS_TSX(&(*left_node)->next, left_node_next, right_node)) 
 	{
 #if GC == 1
 	  node_t* cur = left_node_next;
@@ -136,7 +151,7 @@ harris_search(intset_t *set, skey_t key, node_t **left_node)
 	    {
 	      node_t* free = cur;
 	      cur = (node_t*) get_unmarked_ref((long) cur->next);
-	      ssmem_free(alloc, (void*) free);
+	      ssmem_free(alloc, free);
 	    }
 	  while (cur != right_node);
 #endif
@@ -182,14 +197,13 @@ harris_insert(intset_t *set, skey_t key, sval_t val)
 	
   do 
     {
-      UPDATE_TRY();
       right_node = harris_search(set, key, &left_node);
       if (right_node->key == key)
 	{
 #if GC == 1
 	  if (unlikely(newnode != NULL))
 	    {
-	      ssmem_free(alloc, (void*) newnode);
+	      ssmem_free(alloc, newnode);
 	    }
 #endif
 	  return 0;
@@ -203,10 +217,8 @@ harris_insert(intset_t *set, skey_t key, sval_t val)
 	{
 	  newnode->next = right_node;
 	}
-#ifdef __tile__
-    MEM_BARRIER;
-#endif
-      if (ATOMIC_CAS_MB(&left_node->next, right_node, newnode))
+
+      if (ATOMIC_CAS_TSX(&left_node->next, right_node, newnode))
 	return 1;
     } 
   while(1);
@@ -217,7 +229,7 @@ harris_insert(intset_t *set, skey_t key, sval_t val)
  * or does nothing (if the value is already present).
  * The deletion is logical and consists of setting the node mark bit to 1.
  */
-inline sval_t
+sval_t
 harris_delete(intset_t *set, skey_t key)
 {
   node_t *right_node, *right_node_next, *left_node;
@@ -226,54 +238,31 @@ harris_delete(intset_t *set, skey_t key)
 	
   do 
     {
-      UPDATE_TRY();
       right_node = harris_search(set, key, &left_node);
       if (right_node->key != key)
 	{
 	  return 0;
 	}
       right_node_next = right_node->next;
-
       if (!is_marked_ref((long) right_node_next))
-        {
-
-          TSX_CRITICAL_SECTION
-            {
-              if (right_node->next != right_node_next || left_node->next != right_node)
-                {
-                  TSX_ABORT;
-                }
-              /*Swap*/
-              right_node->next = (void*) get_marked_ref((long) right_node_next);
-              left_node->next = right_node_next;
-              TSX_COMMIT;
-              ret = right_node->val;
-#if GC == 1
-              ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
-#endif
-              return ret;
-            }
-          TSX_AFTER
-
-          /*The fallback path*/
-	  if (ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
+	{
+	  if (ATOMIC_CAS_TSX(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))
 	    {
 	      ret = right_node->val;
-              if (likely(ATOMIC_CAS_MB(&left_node->next, right_node, right_node_next)))
-                {
-#if GC == 1
-                  ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
-#endif
-                }
-              else
-                {
-                  harris_search(set, key, &left_node);
-                }
-	      return ret;
+	      break;
 	    }
 	}
-    }
+    } 
   while(1);
+
+  if (likely(ATOMIC_CAS_TSX(&left_node->next, right_node, right_node_next)))
+    {
+#if GC == 1
+      ssmem_free(alloc, (void*) get_unmarked_ref((long) right_node));
+#endif
+      ;
+    }
+
   return ret;
 }
 

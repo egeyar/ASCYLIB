@@ -264,18 +264,21 @@ typedef volatile UTYPE ptlock_t;
 #  define INIT_LOCK(lock)                               tsx_init(lock)
 #  define DESTROY_LOCK(lock)                    
 #  define LOCK(lock)                                    tsx_lock(lock)
-#  define TRYLOCK(lock)                                 
+#  define TRYLOCK(lock)                                 tsx_trylock(lock)
 #  define UNLOCK(lock)                                  tsx_unlock(lock)
 /* GLOBAL lock */
 #  define GL_INIT_LOCK(lock)                            tsx_init(lock)
 #  define GL_DESTROY_LOCK(lock)                 
 #  define GL_LOCK(lock)                                 tsx_lock(lock)
-#  define GL_TRYLOCK(lock)
+#  define GL_TRYLOCK(lock)                              tsx_trylock(lock)
 #  define GL_UNLOCK(lock)                               tsx_unlock(lock)
+
+static __thread uint64_t tsx_depth = 0;
+#define TSX_DEPTH_INC() // tsx_depth++
+#define TSX_DEPTH_DEC() // tsx_depth--
 
 #  define TAS_FREE 0
 #  define TAS_LCKD 1
-
 #  define TSX_TRIES 3
 
 #  ifdef TSX_STATS
@@ -288,50 +291,52 @@ extern __thread ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
-#    define TSX_CRITICAL_SECTION               \
-long status;                                   \
-int t;                                         \
-for (t = 0; t < TSX_TRIES; t++)                \
-{                                              \
-  my_tsx_trials[t]++;                          \
-  if ((status = _xbegin()) == _XBEGIN_STARTED)
-
-#    define TSX_AFTER                          \
-  else                                         \
-  {                                            \
-    my_tsx_aborts[t]++;                        \
-    if (status & _XABORT_EXPLICIT)             \
-    {                                          \
-      break;                                   \
-    }                                          \
-  pause_rep((1<<(t+1)) & 255);                 \
-  }                                            \
-}
-#    define TSX_ABORT  _xabort(0xff);
-#    define TSX_COMMIT _xend(); my_tsx_commits++;
-
-
-#  else // ifndef TSX_STATS
-#    define TSX_CRITICAL_SECTION               \
-long status;                                   \
-int t;                                         \
-for (t = 0; t < TSX_TRIES; t++)                \
-{                                              \
-  if ((status = _xbegin()) == _XBEGIN_STARTED)
-
-#    define TSX_AFTER                          \
-  else                                         \
-  {                                            \
-    if (status & _XABORT_EXPLICIT)             \
-    {                                          \
-      break;                                   \
-    }                                          \
-  pause_rep((1<<(t+1)) & 255);                 \
-  }                                            \
-}
-#    define TSX_ABORT  _xabort(0xff);
-#    define TSX_COMMIT _xend();
+#    define TSX_STATS_ABORTS(i)  my_tsx_aborts[i]++
+#    define TSX_STATS_TRIALS(i)  my_tsx_trials[i]++
+#    define TSX_STATS_COMMITS()  my_tsx_commits++
+#  else /*if !defined TSX_STATS*/
+#    define TSX_STATS_VARS
+#    define EXTERN_TSX_STATS_VARS
+#    define TSX_STATS_ABORTS(i) 
+#    define TSX_STATS_TRIALS(i)
+#    define TSX_STATS_COMMITS()
 #  endif
+
+#  define TSX_CRITICAL_SECTION                 \
+long status;                                   \
+int t;                                         \
+for (t = 0; t < TSX_TRIES; t++)                \
+{                                              \
+  TSX_STATS_TRIALS(t);                         \
+  TSX_DEPTH_INC();                             \
+  if (/*tsx_depth > 1 ||*/ (status = _xbegin()) == _XBEGIN_STARTED)
+
+#  define TSX_AFTER                            \
+  else                                         \
+  {                                            \
+    TSX_DEPTH_DEC();                           \
+    TSX_STATS_ABORTS(t);                       \
+    if (status & _XABORT_EXPLICIT)             \
+    {                                          \
+      break;                                   \
+    }                                          \
+    if (!(status & _XABORT_RETRY))             \
+    {                                          \
+      break;                                   \
+    }                                          \
+  pause_rep((1<<(t+1)) & 255);                 \
+  }                                            \
+}
+
+#  define TSX_ABORT  _xabort(0xff);
+
+#  define TSX_COMMIT                           \
+if (/*tsx_depth ==*/ 1) {                          \
+  _xend();                                     \
+  TSX_STATS_COMMITS();                         \
+}                                              \
+TSX_DEPTH_DEC();
+
 
 static inline void
 tsx_init(ptlock_t* l)
@@ -345,87 +350,67 @@ tsx_init(ptlock_t* l)
 static inline uint32_t
 tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newValue)
 {
-  int t;
-  for (t = 0; t < TSX_TRIES; t++)
+  TSX_CRITICAL_SECTION
   {
-    long status;
-#  ifdef TSX_STATS
-    my_tsx_trials[t]++;
-#  endif
-    if ((status = _xbegin()) == _XBEGIN_STARTED)
+    if (*addr != oldValue)
     {
-      if (*addr != oldValue)
-      {
-        _xabort(0xff);
-      }
-      *addr = newValue;
-      _xend();
-#  ifdef TSX_STATS
-      my_tsx_commits++;
-#  endif
-      return 1;
+      TSX_ABORT;
     }
-    else
-    {
-#  ifdef TSX_STATS
-      my_tsx_aborts[t]++;
-#  endif
-      if (status & _XABORT_EXPLICIT)
-      {
-        return 0;
-      }
-      if (!(status & _XABORT_RETRY))
-      {
-        break;
-      }
-      PAUSE;
-    }
+    *addr = newValue;
+    TSX_COMMIT;
+    return 1;
   }
+  TSX_AFTER;
   /*Transactionalization of the CAS failed. Apply actual CAS*/
   return ATOMIC_CAS_MB(addr, oldValue, newValue);
+}
+
+static inline uint64_t
+tsx_CAS_PTR(volatile uint64_t * addr, volatile uint64_t oldValue, volatile uint64_t newValue)
+{
+  TSX_CRITICAL_SECTION
+  {
+    if (*addr != oldValue)
+    {
+      TSX_ABORT;
+    }
+    *addr = newValue;
+    TSX_COMMIT;
+    return oldValue;
+  }
+  TSX_AFTER;
+  /*Transactionalization of the CAS failed. Apply actual CAS*/
+  return CAS_U64(addr, oldValue, newValue);
 }
 
 static inline uint32_t
 tsx_lock(ptlock_t* l)
 {
-  int t;
-  for (t = 0; t < TSX_TRIES; t++)
+  while (*l != TAS_FREE)
   {
-#  ifdef TSX_STATS
-    my_tsx_trials[t]++;
-#  endif
-    while (*l != TAS_FREE)
-    {
-      PAUSE;
-    }
-    long status;
-    if ((status = _xbegin()) == _XBEGIN_STARTED)
-    {
-      if (*l == TAS_FREE)
-      {
-        return 0;
-      }
-    _xabort(0xff);
-    }
-    else
-    {
-#  ifdef TSX_STATS
-      my_tsx_aborts[t]++;
-#  endif
-      if (status & _XABORT_EXPLICIT || !(status & _XABORT_RETRY))
-      {
-        break;
-      }
-      pause_rep((1<<(t+1)) & 255);
-    }
+    PAUSE;
   }
+  TSX_CRITICAL_SECTION
+  {
+    if (*l == TAS_FREE)
+    {
+      return 0;
+    }
+    TSX_ABORT;
+  }
+  TSX_AFTER;
 
   while (__atomic_exchange_n(l, TAS_LCKD, __ATOMIC_ACQUIRE))
   {
     PAUSE;
   }
-
   return 0;
+}
+
+static inline uint32_t
+tsx_trylock(ptlock_t* l)
+{
+  return ((ptlock_t*)tsx_CAS_PTR((uint64_t*)l, (uint64_t)TAS_FREE, (uint64_t)TAS_LCKD) == TAS_FREE);
 }
 
 static inline uint32_t
@@ -433,16 +418,12 @@ tsx_unlock(ptlock_t* l)
 {
   if (*l == TAS_FREE)
   {
-    _xend();
-#  ifdef TSX_STATS
-    my_tsx_commits++;
-#  endif
+    TSX_COMMIT;
   }
   else
   {
     __atomic_clear(l, __ATOMIC_RELEASE);
   }
-
   return 0;
 }
 

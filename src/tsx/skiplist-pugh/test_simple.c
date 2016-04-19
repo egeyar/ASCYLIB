@@ -47,20 +47,20 @@
 #  include <sys/procset.h>
 #endif
 
-#include "hashtable-lock.h"
+#include "intset.h"
 
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,t)  ht_contains(s, k)
-#define DS_ADD(s,k,t)       ht_add(s, k, k)
-#define DS_REMOVE(s,k,t)    ht_remove(s, k)
-#define DS_SIZE(s)          ht_size(s)
-#define DS_NEW()            ht_new()
+#define DS_CONTAINS(s,k,t)  sl_contains(s, k)
+#define DS_ADD(s,k,t)       sl_add(s, k, k)
+#define DS_REMOVE(s,k,t)    sl_remove(s, k)
+#define DS_SIZE(s)          sl_set_size(s)
+#define DS_NEW()            sl_set_new()
 
-#define DS_TYPE             ht_intset_t
-#define DS_NODE             node_l_t
+#define DS_TYPE             sl_intset_t
+#define DS_NODE             sl_node_t
 
 /* ################################################################### *
  * GLOBALS
@@ -70,8 +70,8 @@ RETRY_STATS_VARS_GLOBAL;
 
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
-size_t load_factor = DEFAULT_LOAD;
 size_t update = DEFAULT_UPDATE;
+size_t load_factor;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
 
@@ -107,7 +107,6 @@ volatile ticks *tsx_trials[3];
 volatile ticks *tsx_commits;
 volatile ticks *tsx_aborts[3];
 #endif
-
 
 /* ################################################################### *
  * LOCALS
@@ -167,7 +166,9 @@ test(void* thread)
   assert(alloc != NULL);
   ssmem_alloc_init_fs_size(alloc, SSMEM_DEFAULT_MEM_SIZE, SSMEM_GC_FREE_SET_SIZE, ID);
 #endif
+    
 
+  RR_INIT(phys_id);
   barrier_cross(&barrier);
 
   uint64_t key;
@@ -186,7 +187,7 @@ test(void* thread)
 #if INITIALIZE_FROM_ONE == 1
   num_elems_thread = (ID == 0) * initial;
 #endif
-
+    
   for(i = 0; i < num_elems_thread; i++) 
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
@@ -198,6 +199,8 @@ test(void* thread)
     }
   MEM_BARRIER;
 
+  RETRY_STATS_ZERO();
+
   barrier_cross(&barrier);
 
   if (!ID)
@@ -206,9 +209,9 @@ test(void* thread)
     }
 
 
-  RETRY_STATS_ZERO();
-
   barrier_cross(&barrier_global);
+
+  RR_START_SIMPLE();
 
   while (stop == 0) 
     {
@@ -216,6 +219,7 @@ test(void* thread)
     }
 
   barrier_cross(&barrier);
+  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -274,8 +278,6 @@ main(int argc, char **argv)
   ssalloc_init();
   seeds = seed_rand();
 
-  RR_INIT_ALL();
-
   struct option long_options[] = {
     // These options don't set a flag
     {"help",                      no_argument,       NULL, 'h'},
@@ -287,7 +289,6 @@ main(int argc, char **argv)
     {"num-buckets",               required_argument, NULL, 'b'},
     {"print-vals",                required_argument, NULL, 'v'},
     {"vals-pf",                   required_argument, NULL, 'f'},
-    {"load-factor",               required_argument, NULL, 'l'},
     {NULL, 0, NULL, 0}
   };
 
@@ -386,13 +387,20 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Initial: %zu / Range: %zu / Load factor: %zu / ", initial, range, load_factor);
-  printf("\n");
+  printf("## Initial: %zu / Range: %zu / ", initial, range);
+  printf("Pugh's algorithm\n");
 
+  levelmax = floor_log_2((unsigned int) initial);
+  size_pad_32 = sizeof(sl_node_t) + (levelmax * sizeof(sl_node_t *));
+  while (size_pad_32 & 31)
+    {
+      size_pad_32++;
+    }
 
-  double kb = initial * sizeof(DS_NODE) / 1024.0;
+  printf("lvl max = %d\n", levelmax);
+  double kb = (initial * size_pad_32) / 1024.0;
   double mb = kb / 1024.0;
-  printf("Sizeof initial: %.2f KB = %.2f MB\n", kb, mb);
+  printf("Sizeof initial: %.2f KB = %.2f MB = %.2f GB\n", kb, mb, mb / 1024);
 
   if (!is_power_of_two(range))
     {
@@ -434,8 +442,7 @@ main(int argc, char **argv)
   timeout.tv_nsec = (duration % 1000) * 1000000;
     
   stop = 0;
-    
-  maxhtlength = (unsigned int) initial / load_factor;
+   
 
   DS_TYPE* set = DS_NEW();
   assert(set != NULL);
@@ -496,10 +503,7 @@ main(int argc, char **argv)
     
   barrier_cross(&barrier_global);
   gettimeofday(&start, NULL);
-
-  RR_START_UNPROTECTED_ALL();
   nanosleep(&timeout, NULL);
-  RR_STOP_UNPROTECTED_ALL();
 
   stop = 1;
   gettimeofday(&end, NULL);
@@ -614,7 +618,6 @@ main(int argc, char **argv)
   RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
   RR_PRINT_CORRECTED();
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
-
   pthread_exit(NULL);
     
   return 0;

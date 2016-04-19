@@ -288,6 +288,7 @@ uint8_t oldval;
 #define ATOMIC_FETCH_AND_INC_FULL(a)    FAI_U32(a)
 #ifdef TSX
 #  define ATOMIC_CAS_TSX(a, e, v)       tsx_CAS((volatile AO_t *) (a),(AO_t) (e), (AO_t) (v))
+#  define ATOMIC_CAS_TSX64(a, e, v)     tsx_CAS_PTR((volatile uint64_t *) (a),(uint64_t) (e), (uint64_t) (v))
 #endif
 
 /* end -- generic code */

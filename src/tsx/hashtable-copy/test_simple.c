@@ -1,8 +1,8 @@
 /*   
- *   File: test_correct.c
+ *   File: test_simple.c
  *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
  *   Description: 
- *   test_correct.c is part of ASCYLIB
+ *   test_simple.c is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
  * 	     	      Tudor David <tudor.david@epfl.ch>
@@ -40,30 +40,27 @@
 #include <malloc.h>
 #include "utils.h"
 #include "atomic_ops.h"
-#include "ssmem.h"
+#include "rapl_read.h"
 #ifdef __sparc__
 #  include <sys/types.h>
 #  include <sys/processor.h>
 #  include <sys/procset.h>
 #endif
 
-#include "bst-aravind.h"
+#include "copy_on_write.h"
 
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(k,r)  bst_search(k,r)
-#define DS_ADD(k,v,r)       bst_insert(k,(sval_t)v,r)
-#define DS_REMOVE(k,r)    bst_remove(k,r)
-#define DS_SIZE(s)          bst_size(s)
-#define DS_NEW()           initialize_tree()
-#define DS_LOCAL()         bst_init_local()
+#define DS_CONTAINS(s,k,t)  cpy_search(s, k)
+#define DS_ADD(s,k,t)       cpy_insert(s, k, k)
+#define DS_REMOVE(s,k,t)    cpy_delete(s, k)
+#define DS_SIZE(s)          copy_on_write_size(s)
+#define DS_NEW(nb)          copy_on_write_new(nb)
 
-#define DS_TYPE             node_t
-#define DS_NODE             node_t
-#define DS_KEY              skey_t
-
+#define DS_TYPE             copy_on_write_t
+#define DS_NODE             kv_t
 
 /* ################################################################### *
  * GLOBALS
@@ -71,6 +68,7 @@
 
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
+size_t load_factor = DEFAULT_LOAD;
 size_t update = DEFAULT_UPDATE;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
@@ -87,7 +85,7 @@ uint32_t rand_max;
 #define rand_min 1
 
 static volatile int stop;
-__thread uint32_t phys_id;
+TEST_VARS_GLOBAL;
 
 volatile ticks *putting_succ;
 volatile ticks *putting_fail;
@@ -102,7 +100,11 @@ volatile ticks *getting_count_succ;
 volatile ticks *removing_count;
 volatile ticks *removing_count_succ;
 volatile ticks *total;
-
+#if defined(TSX_STATS)
+volatile ticks *tsx_trials[3];
+volatile ticks *tsx_commits;
+volatile ticks *tsx_aborts[3];
+#endif
 
 /* ################################################################### *
  * LOCALS
@@ -129,7 +131,6 @@ test(void* thread)
   uint32_t ID = td->id;
   set_cpu(ID);
   ssalloc_init();
-  DS_LOCAL();
 
   DS_TYPE* set = td->set;
 
@@ -158,17 +159,23 @@ test(void* thread)
 #endif
     
   seeds = seed_rand();
+
+#if defined(HTICKET)
+  init_thread_htlocks(the_cores[d->id]);
+#elif defined(CLH)
+  init_clh_thread(&clh_local_p);
+#endif
+
 #if GC == 1
   alloc = (ssmem_allocator_t*) malloc(sizeof(ssmem_allocator_t));
   assert(alloc != NULL);
-  ssmem_alloc_init(alloc, SSMEM_DEFAULT_MEM_SIZE, ID);
-  ssmem_allocator_t* alloc_data = (ssmem_allocator_t*) malloc(sizeof(ssmem_allocator_t));
-  assert(alloc_data != NULL);
-  ssmem_alloc_init(alloc_data, SSMEM_DEFAULT_MEM_SIZE, ID);
+  ssmem_alloc_init_fs_size(alloc, SSMEM_DEFAULT_MEM_SIZE, SSMEM_GC_FREE_SET_SIZE, ID);
 #endif
-    
-  DS_KEY key;
-  size_t* val = NULL;
+
+  RR_INIT(phys_id);
+  barrier_cross(&barrier);
+
+  uint64_t key;
   int c = 0;
   uint32_t scale_rem = (uint32_t) (update_rate * UINT_MAX);
   uint32_t scale_put = (uint32_t) (put_rate * UINT_MAX);
@@ -180,27 +187,22 @@ test(void* thread)
     {
       num_elems_thread++;
     }
+
+#if INITIALIZE_FROM_ONE == 1
+  num_elems_thread = (ID == 0) * initial;
+#endif
     
   for(i = 0; i < num_elems_thread; i++) 
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
       
-      if (val == NULL)
-	{
-	  val = (size_t*) ssmem_alloc(alloc_data, sizeof(size_t));
-	}
-      val[0] = key;
-
-      if(DS_ADD(key, val, set) == false)
+      if(DS_ADD(set, key, ALGO_TYPE) == false)
 	{
 	  i--;
 	}
-      else
-	{
-	  val = NULL;
-	}
     }
   MEM_BARRIER;
+
   barrier_cross(&barrier);
 
   if (!ID)
@@ -208,75 +210,18 @@ test(void* thread)
       printf("#BEFORE size is: %zu\n", (size_t) DS_SIZE(set));
     }
 
+
   barrier_cross(&barrier_global);
+
+  RR_START_SIMPLE();
+
   while (stop == 0) 
     {
-      c = (uint32_t)(my_random(&(seeds[0]),&(seeds[1]),&(seeds[2])));
-      key = (c & rand_max) + rand_min;
-
-      if (unlikely(c <= scale_put))
-	{
-	  if (val == NULL)
-	    {
-	      val = (size_t*) ssmem_alloc(alloc_data, sizeof(size_t));
-	    }
-	  val[0] = key;
-
-	  int res;
-	  START_TS(1);
-	  res = DS_ADD(key, val, set);
-	  END_TS(1, my_putting_count);
-	  if(res)
-	    {
-	      ADD_DUR(my_putting_succ);
-	      my_putting_count_succ++;
-	      val = NULL;
-	    }
-	  ADD_DUR_FAIL(my_putting_fail);
-	  my_putting_count++;
-	} 
-      else if(unlikely(c <= scale_rem))
-	{
-	  size_t* removed;
-	  START_TS(2);
-	  removed = (size_t*) DS_REMOVE(key, set);
-	  END_TS(2, my_removing_count);
-	  if(removed != NULL) 
-	    {
-	      ADD_DUR(my_removing_succ);
-	      my_removing_count_succ++;
-	      if (removed[0] != key)
-		{
-		  printf(" *[REM]* WRONG for key: %-10lu : %-10lu @ %p\n", key, removed[0], removed);
-		}
-	      ssmem_free(alloc_data, removed);
-	    }
-	  ADD_DUR_FAIL(my_removing_fail);
-	  my_removing_count++;
-	}
-      else
-	{ 
-	  size_t* res;
-      sval_t search_res;
-	  START_TS(0);
-	  search_res = DS_CONTAINS(key, set);
-	  END_TS(0, my_getting_count);
-	  if(search_res != 0) 
-	    {
-
-        res = (size_t*) search_res->value;
-	      ADD_DUR(my_getting_succ);
-	      my_getting_count_succ++;
-	      if (res[0] != key)
-		{
-		  printf(" *[GET]* WRONG for key: %-10lu : %-10lu @ %p\n", key, res[0], res);
-		}
-	    }
-	  ADD_DUR_FAIL(my_getting_fail);
-	  my_getting_count++;
-	}
+      TEST_LOOP(ALGO_TYPE);
     }
+
   barrier_cross(&barrier);
+  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -293,6 +238,15 @@ test(void* thread)
   getting_fail[ID] += my_getting_fail;
   removing_succ[ID] += my_removing_succ;
   removing_fail[ID] += my_removing_fail;
+#endif
+#if defined(TSX_STATS)
+  tsx_trials[0][ID] += my_tsx_trials[0];
+  tsx_trials[1][ID] += my_tsx_trials[1];
+  tsx_trials[2][ID] += my_tsx_trials[2];
+  tsx_commits[ID] += my_tsx_commits;
+  tsx_aborts[0][ID] += my_tsx_aborts[0];
+  tsx_aborts[1][ID] += my_tsx_aborts[1];
+  tsx_aborts[2][ID] += my_tsx_aborts[2];
 #endif
   putting_count[ID] += my_putting_count;
   getting_count[ID] += my_getting_count;
@@ -312,9 +266,8 @@ test(void* thread)
 #if GC == 1
   ssmem_term();
   free(alloc);
-  free(alloc_data);
 #endif
-
+  THREAD_END();
   pthread_exit(NULL);
 }
 
@@ -336,6 +289,7 @@ main(int argc, char **argv)
     {"num-buckets",               required_argument, NULL, 'b'},
     {"print-vals",                required_argument, NULL, 'v'},
     {"vals-pf",                   required_argument, NULL, 'f'},
+    {"load-factor",               required_argument, NULL, 'l'},
     {NULL, 0, NULL, 0}
   };
 
@@ -343,7 +297,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:x:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -384,6 +338,11 @@ main(int argc, char **argv)
 		 "        When using detailed profiling, how many values to print.\n"
 		 "  -f, --val-pf <int>\n"
 		 "        When using detailed profiling, how many values to keep track of.\n"
+		 "  -x, --lock-based algorithm (default=1)\n"
+		 "        Use lock-based algorithm\n"
+		 "        1 = lock-coupling,\n"
+		 "        2 = lazy algorithm\n"
+		 "        3 = Pugh's lazy algorithm\n"
 		 , argv[0]);
 	  exit(0);
 	case 'd':
@@ -404,6 +363,9 @@ main(int argc, char **argv)
 	case 'p':
 	  put_explicit = 1;
 	  put = atoi(optarg);
+	  break;
+	case 'l':
+	  load_factor = atoi(optarg);
 	  break;
 	case 'v':
 	  print_vals_num = atoi(optarg);
@@ -431,8 +393,7 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Test correctness \n");
-  printf("## Initial: %zu / Range: %zu\n", initial, range);
+  printf("## Initial: %zu / Range: %zu / Load factor: %zu \n", initial, range, load_factor);
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
   double mb = kb / 1024.0;
@@ -479,7 +440,10 @@ main(int argc, char **argv)
     
   stop = 0;
     
-  DS_TYPE* set = DS_NEW();
+  size_t maxhtlength = (unsigned int) initial / load_factor;
+  array_ll_fixed_size = range / maxhtlength;
+
+  DS_TYPE* set = DS_NEW(maxhtlength);
   assert(set != NULL);
 
   /* Initializes the local data */
@@ -495,7 +459,16 @@ main(int argc, char **argv)
   getting_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
-    
+#if defined(TSX_STATS)
+  tsx_trials[0] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_trials[1] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_trials[2] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_commits = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[0] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[1] = (ticks *) calloc(num_threads, sizeof(ticks));
+  tsx_aborts[2] = (ticks *) calloc(num_threads, sizeof(ticks));
+#endif
+
   pthread_t threads[num_threads];
   pthread_attr_t attr;
   int rc;
@@ -559,7 +532,12 @@ main(int argc, char **argv)
   volatile uint64_t getting_count_total_succ = 0;
   volatile uint64_t removing_count_total = 0;
   volatile uint64_t removing_count_total_succ = 0;
-    
+#if defined(TSX_STATS)
+  volatile uint64_t tsx_trials_total[3] = {0, 0, 0};
+  volatile uint64_t tsx_commits_total = 0;
+  volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
+#endif
+
   for(t=0; t < num_threads; t++) 
     {
       PRINT_OPS_PER_THREAD();
@@ -575,6 +553,15 @@ main(int argc, char **argv)
       getting_count_total_succ += getting_count_succ[t];
       removing_count_total += removing_count[t];
       removing_count_total_succ += removing_count_succ[t];
+#if defined(TSX_STATS)
+      tsx_trials_total[0] += tsx_trials[0][t];
+      tsx_trials_total[1] += tsx_trials[1][t];
+      tsx_trials_total[2] += tsx_trials[2][t];
+      tsx_commits_total += tsx_commits[t];
+      tsx_aborts_total[0] += tsx_aborts[0][t];
+      tsx_aborts_total[1] += tsx_aborts[1][t];
+      tsx_aborts_total[2] += tsx_aborts[2][t];
+#endif
     }
 
 #if defined(COMPUTE_LATENCY)
@@ -587,7 +574,18 @@ main(int argc, char **argv)
   long unsigned rem_fal = (removing_count_total - removing_count_total_succ) ? removing_fal_total / (removing_count_total - removing_count_total_succ) : 0;
   printf("%-7zu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu\n", num_threads, get_suc, get_fal, put_suc, put_fal, rem_suc, rem_fal);
 #endif
-    
+#if defined(TSX_STATS)
+  printf("           %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n",
+         "commit_rate", "commits",
+         "trials_rnd1", "trials_rnd2", "trials_rnd3",
+         "aborts_rnd1", "aborts_rnd2", "aborts_rnd3");
+  printf("tsx stats :%-12f %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu\n",
+         (float)tsx_commits_total/tsx_trials_total[0], tsx_commits_total,
+         tsx_trials_total[0], tsx_trials_total[1], tsx_trials_total[2],
+         tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);
+  fflush(stdout);
+#endif
+
 #define LLU long long unsigned int
 
   int UNUSED pr = (int) (putting_count_total_succ - removing_count_total_succ);
@@ -615,7 +613,10 @@ main(int argc, char **argv)
   double throughput = (putting_count_total + getting_count_total + removing_count_total) * 1000.0 / duration;
   printf("#txs %zu\t(%-10.0f\n", num_threads, throughput);
   printf("#Mops %.3f\n", throughput / 1e6);
-    
+
+  RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
+  RR_PRINT_CORRECTED();
+
   pthread_exit(NULL);
     
   return 0;

@@ -47,20 +47,20 @@
 #  include <sys/procset.h>
 #endif
 
-#include "hashtable-lock.h"
+#include "concurrent_hash_map2.h"
 
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,t)  ht_contains(s, k)
-#define DS_ADD(s,k,t)       ht_add(s, k, k)
-#define DS_REMOVE(s,k,t)    ht_remove(s, k)
-#define DS_SIZE(s)          ht_size(s)
-#define DS_NEW()            ht_new()
+#define DS_CONTAINS(s,k,t)    chm_get(s, k)
+#define DS_ADD(s,k,t)         chm_put(s, k, k)
+#define DS_REMOVE(s,k,t)      chm_rem(s, k)
+#define DS_SIZE(s)            chm_size(s)
+#define DS_NEW(ca,co)         chm_new(ca, co)
 
-#define DS_TYPE             ht_intset_t
-#define DS_NODE             node_l_t
+#define DS_TYPE               chm_t
+#define DS_NODE               chm_node_t
 
 /* ################################################################### *
  * GLOBALS
@@ -69,6 +69,7 @@
 RETRY_STATS_VARS_GLOBAL;
 
 size_t initial = DEFAULT_INITIAL;
+size_t concurrency = CHM_NUM_SEGMENTS;
 size_t range = DEFAULT_RANGE; 
 size_t load_factor = DEFAULT_LOAD;
 size_t update = DEFAULT_UPDATE;
@@ -166,8 +167,10 @@ test(void* thread)
   alloc = (ssmem_allocator_t*) malloc(sizeof(ssmem_allocator_t));
   assert(alloc != NULL);
   ssmem_alloc_init_fs_size(alloc, SSMEM_DEFAULT_MEM_SIZE, SSMEM_GC_FREE_SET_SIZE, ID);
+  barrier_cross(&barrier);
 #endif
 
+  RR_INIT(phys_id);
   barrier_cross(&barrier);
 
   uint64_t key;
@@ -205,10 +208,11 @@ test(void* thread)
       printf("#BEFORE size is: %zu\n", (size_t) DS_SIZE(set));
     }
 
-
   RETRY_STATS_ZERO();
 
   barrier_cross(&barrier_global);
+
+  RR_START_SIMPLE();
 
   while (stop == 0) 
     {
@@ -216,6 +220,7 @@ test(void* thread)
     }
 
   barrier_cross(&barrier);
+  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -260,10 +265,11 @@ test(void* thread)
 
   SSPFDTERM();
 #if GC == 1
-  ssmem_term();
+  /* ssmem_term(); */
   free(alloc);
 #endif
   THREAD_END();
+
   pthread_exit(NULL);
 }
 
@@ -273,8 +279,6 @@ main(int argc, char **argv)
   set_cpu(0);
   ssalloc_init();
   seeds = seed_rand();
-
-  RR_INIT_ALL();
 
   struct option long_options[] = {
     // These options don't set a flag
@@ -288,6 +292,7 @@ main(int argc, char **argv)
     {"print-vals",                required_argument, NULL, 'v'},
     {"vals-pf",                   required_argument, NULL, 'f'},
     {"load-factor",               required_argument, NULL, 'l'},
+    {"concurrency",               required_argument, NULL, 'c'},
     {NULL, 0, NULL, 0}
   };
 
@@ -295,7 +300,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:c:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -322,6 +327,8 @@ main(int argc, char **argv)
 		 "        Test duration in milliseconds\n"
 		 "  -i, --initial-size <int>\n"
 		 "        Number of elements to insert before test\n"
+		 "  -c, --concurrency <int>\n"
+		 "        Concurrency level for the hash table\n"
 		 "  -n, --num-threads <int>\n"
 		 "        Number of threads\n"
 		 "  -r, --range <int>\n"
@@ -343,6 +350,9 @@ main(int argc, char **argv)
 	  break;
 	case 'i':
 	  initial = atoi(optarg);
+	  break;
+	case 'c':
+	  concurrency = pow2roundup(atoi(optarg));
 	  break;
 	case 'n':
 	  num_threads = atoi(optarg);
@@ -386,11 +396,10 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Initial: %zu / Range: %zu / Load factor: %zu / ", initial, range, load_factor);
-  printf("\n");
+  printf("## Initial: %zu / Range: %zu / Load factor: %zu / Concurrency: %zu\n", initial, range, load_factor, concurrency);
 
-
-  double kb = initial * sizeof(DS_NODE) / 1024.0;
+  double kb = initial * (sizeof(DS_NODE) + sizeof(chm_node_t*)) / 1024.0;
+  kb += (concurrency * (sizeof(chm_seg_t) + sizeof(chm_seg_t*))) / 1024.0;
   double mb = kb / 1024.0;
   printf("Sizeof initial: %.2f KB = %.2f MB\n", kb, mb);
 
@@ -419,12 +428,6 @@ main(int argc, char **argv)
 
   get_rate = 1 - update_rate;
 
-  /* printf("num_threads = %u\n", num_threads); */
-  /* printf("cap: = %u\n", num_buckets); */
-  /* printf("num elem = %u\n", num_elements); */
-  /* printf("filing rate= %f\n", filling_rate); */
-  /* printf("update = %f (putting = %f)\n", update_rate, put_rate); */
-
 
   rand_max = range - 1;
     
@@ -435,9 +438,9 @@ main(int argc, char **argv)
     
   stop = 0;
     
-  maxhtlength = (unsigned int) initial / load_factor;
+  size_t capacity = initial / load_factor;
 
-  DS_TYPE* set = DS_NEW();
+  DS_TYPE* set = DS_NEW(capacity, concurrency);
   assert(set != NULL);
 
   /* Initializes the local data */
@@ -496,10 +499,7 @@ main(int argc, char **argv)
     
   barrier_cross(&barrier_global);
   gettimeofday(&start, NULL);
-
-  RR_START_UNPROTECTED_ALL();
   nanosleep(&timeout, NULL);
-  RR_STOP_UNPROTECTED_ALL();
 
   stop = 1;
   gettimeofday(&end, NULL);
@@ -534,7 +534,7 @@ main(int argc, char **argv)
   volatile uint64_t tsx_commits_total = 0;
   volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
 #endif
-
+   
   for(t=0; t < num_threads; t++) 
     {
       PRINT_OPS_PER_THREAD();
@@ -589,7 +589,9 @@ main(int argc, char **argv)
   if (size_after != (initial + pr))
     {
       printf("// WRONG size. %zu + %d != %zu\n", initial, pr, size_after);
+#if ASSERT_SIZE == 1
       assert(size_after == (initial + pr));
+#endif
     }
 
   printf("    : %-10s | %-10s | %-11s | %-11s | %s\n", "total", "success", "succ %", "total %", "effective %");
