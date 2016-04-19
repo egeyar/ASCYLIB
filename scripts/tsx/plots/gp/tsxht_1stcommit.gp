@@ -6,7 +6,7 @@ PSIZE = "set size 0.41, 0.6"
 
 set key horiz maxrows 1
 
-set output "eps/tsxht_stats.eps"
+set output "eps/tsxht_1stcommit.eps"
 
 set terminal postscript color "Helvetica" 24 eps enhanced
 set rmargin 0
@@ -64,7 +64,7 @@ FILE2 = '"data/data.stats.ht.i512.u10.w0.dat"'
 unset xlabel
 unset key
 set xtics 20 
-set ytics 10 
+set ytics 20 
 
 set size plot_size_x, plot_size_y
 set multiplot layout 5, 2
@@ -76,9 +76,9 @@ set lmargin 3
 
 set origin 0.0 + graphs_x_offs, top_row_y + graphs_y_offs
 set title @PLOT0 offset 0.2, title_offset
-set ylabel 'Commit Rate (%)' offset 3,-0.5 font ",22"
+set ylabel 'Commits at 1st (%)' offset 3,-0.5 font ",22"
 #set ytics 99 0.1 font ",18"
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, top_row_y + graphs_y_offs
 @PSIZE
@@ -88,7 +88,7 @@ set ylabel ""
 unset ylabel
 set title @PLOT1
 #set ytics 98 0.2 font ",18"
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, top_row_y + graphs_y_offs
 @PSIZE
@@ -98,7 +98,7 @@ set ylabel ""
 unset ylabel
 set title @PLOT2
 #set ytics 80 4 font ",18"
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 
 # ##########################################################################################
@@ -115,9 +115,9 @@ set lmargin 3
 @PSIZE
 set origin 0.0 + graphs_x_offs, top_mid_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 3,-0.5 font ",22"
+set ylabel 'Commits at 1st (%)' offset 3,-0.5 font ",22"
 #set ytics 99 0.1 font ",18"
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, top_mid_row_y + graphs_y_offs
 @PSIZE
@@ -127,7 +127,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 #set ytics 98 0.2 font ",18"
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, top_mid_row_y + graphs_y_offs
 @PSIZE
@@ -136,7 +136,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 #set ytics 80 4 font ",18"
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 
 # ##########################################################################################
@@ -153,9 +153,9 @@ set lmargin 3
 @PSIZE
 set origin 0.0 + graphs_x_offs, mid_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 3,-0.5 font ",22"
+set ylabel 'Commits at 1st (%)' offset 3,-0.5 font ",22"
 #set ytics 99 0.1 font ",18"
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, mid_row_y + graphs_y_offs
 @PSIZE
@@ -165,7 +165,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 #set ytics 98 0.2 font ",18"
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, mid_row_y + graphs_y_offs
 @PSIZE
@@ -174,7 +174,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 #set ytics 80 4 font ",18"
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 
 # ##########################################################################################
@@ -191,9 +191,9 @@ set lmargin 3
 @PSIZE
 set origin 0.0 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 3,-0.5 font ",22"
+set ylabel 'Commits at 1st (%)' offset 3,-0.5 font ",22"
 #set ytics 99 0.1 font ",18"
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
 @PSIZE
@@ -203,7 +203,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 #set ytics 98 0.2 font ",18"
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
 @PSIZE
@@ -212,7 +212,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 #set ytics 80 4 font ",18"
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 
 # ##########################################################################################
@@ -231,9 +231,9 @@ set lmargin 3
 @PSIZE
 set origin 0.0 + graphs_x_offs, bottom_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 3,-0.5 font ",22"
+set ylabel 'Commits at 1st (%)' offset 3,-0.5 font ",22"
 #set ytics 99 0.1 font ",18"
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, bottom_row_y + graphs_y_offs
 @PSIZE
@@ -243,7 +243,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 #set ytics 98 0.2 font ",18"
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, bottom_row_y + graphs_y_offs
 @PSIZE
@@ -252,7 +252,7 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 #set ytics 80 4 font ",18"
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(direct_commit_rate(i)) ls i with linespoints
 
 unset origin
 unset border

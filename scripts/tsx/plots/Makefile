@@ -33,11 +33,28 @@ camera:
 	gnuplot gp/sl_small2.gp
 
 tsxll:
-	gnuplot gp/tsxll.gp
+	gnuplot gp/tsxll_stats.gp
+	gnuplot gp/tsxll_thr.gp
 tsxsl:
-	gnuplot gp/tsxsl.gp
+	gnuplot gp/tsxsl_stats.gp
+	gnuplot gp/tsxsl_thr.gp
 tsxht:
-	gnuplot gp/tsxht.gp
+	gnuplot gp/tsxht_stats.gp
+	gnuplot gp/tsxht_thr.gp
 tsxbst:
-	gnuplot gp/tsxbst.gp
+	gnuplot gp/tsxbst_stats.gp
+	gnuplot gp/tsxbst_thr.gp
+tsx_stats:
+	gnuplot gp/tsxll_stats.gp
+	gnuplot gp/tsxsl_stats.gp
+	gnuplot gp/tsxht_stats.gp
+	gnuplot gp/tsxbst_stats.gp
+tsx_thr:
+	gnuplot gp/tsxll_thr.gp
+	gnuplot gp/tsxsl_thr.gp
+	gnuplot gp/tsxht_thr.gp
+	gnuplot gp/tsxbst_thr.gp
+
 tsx:    tsxll tsxsl tsxht tsxbst
+
+
