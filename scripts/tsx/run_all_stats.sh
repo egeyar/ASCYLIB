@@ -54,14 +54,7 @@ printf "           : = %-10.2f hours\n" $nht;
 echo "";
 echo "    (you can adjust the #repetitions and the duration in ./scripts/tsx/run.config";
 
-printf "\n   Continue? [Y/n] ";
-read cont;
-if [ "$cont" = "n" ];
-then
-    exit 1;
-fi;
-
-ds="ll sl ht";
+ds="ll sl ht bst";
 for d in $ds;
 do
     printf "######################## %-3s ############################################################\n" $d;

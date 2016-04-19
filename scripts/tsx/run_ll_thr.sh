@@ -15,11 +15,11 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/lb-ll_lazy ${ub}/lf-ll_harris );
+algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/lf-ll_harris ${ub}/tsx-ll_lazy ${ub}/lb-ll_lazy ${ub}/tsx-ll_pugh ${ub}/lb-ll_pugh );
 
-params_i=( 64 1024 8192 64 1024 8192 64 1024 8192 );
-params_u=( 40 40   40   20 20   20   10 10   10   );
-params_w=( 0   0   0    0   0   0    0   0   0    );
+params_i=( 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 );
+params_u=( 80 80   80   60 60   60   40 40   40   20 20   20   10 10   10   );
+params_w=( 0  0    0    0  0    0    0  0    0    0  0    0    0  0    0    );
 
 np=${#params_i[*]};
 
@@ -34,16 +34,6 @@ dur_tot=$(echo "$na*$np*$nc*$repetitions*$dur_s" | bc -l);
 
 printf "#> $na algos, $np params, $nc cores, $repetitions reps of %.2f sec = %.2f sec\n" $dur_s $dur_tot;
 printf "#> = %.2f hours\n" $(echo $dur_tot/3600 | bc -l);
-
-if [ $skip -eq 0 ];
-then
-    printf "   Continue? [Y/n] ";
-    read cont;
-    if [ "$cont" = "n" ];
-    then
-	exit;
-    fi;
-fi;
 
 cores=$cores_backup;
 
@@ -76,6 +66,8 @@ then
 	    echo "----> Cannot mv executables in $ub!"; exit;
 	fi;
     done;
+
+    exit 1;
 fi;
 
 

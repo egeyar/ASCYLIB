@@ -15,16 +15,12 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-do_thr=1;
-do_ldi=0;
+algos=( ${ub}/tsx-bst_tk ${ub}/tsx-bst_aravind_cas ${ub}/tsx-bst_aravind_tsx );
 
-
-algos=( ./${ub}/tsx-bst_tk );
-
-param_i=65534;
-params_p=( 40 50 60 );
-params_nc=( 10 20 );		# for latency distribution
-np=${#params_p[*]};
+params_i=( 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 );
+params_u=( 80   80    80    60   60    60    40   40    40    20   20    20    10   10    10    );
+params_w=( 0    0     0     0    0     0     0    0     0     0    0     0     0    0     0     );
+np=${#params_i[*]};
 
 cores_backup=$cores;
 . ./scripts/config;
@@ -33,66 +29,71 @@ nc=$(echo "$cores" | wc -w);
 dur_s=$(echo $duration/1000 | bc -l);
 na=${#algos[@]};
 
-dur_thr=$(echo "$do_thr*$na*$np*$nc*$repetitions*$dur_s" | bc -l);
-nc_ldi=${#params_nc[@]};
-dur_ldi=$(echo "$do_ldi*$na*$np*$nc_ldi*$repetitions*$dur_s" | bc -l);
-dur_tot=$(echo "$dur_thr+$dur_ldi" | bc -l);
+dur_tot=$(echo "$na*$np*$nc*$repetitions*$dur_s" | bc -l);
 
-tf=( false true );
-printf "#> measure throughput: %-5s / ldi: %-5s\n" ${tf[$do_thr]} ${tf[$do_ldi]}
 printf "#> $na algos, $np params, $nc cores, $repetitions reps of %.2f sec = %.2f sec\n" $dur_s $dur_tot;
 printf "#> = %.2f hours\n" $(echo $dur_tot/3600 | bc -l);
 
-if [ $skip -eq 0 ];
+cores=$cores_backup;
+
+if [ $do_compile -eq 1 ];
 then
-    printf "   Continue? [Y/n] ";
-    read cont;
-    if [ "$cont" = "n" ];
-    then
-	exit;
-    fi;
+    ctarget=tsx${ds};
+    for WORKLOAD in 0;
+    do
+        cflags="SET_CPU=$set_cpu TSX_STATS=1";
+        echo "----> Compiling" $ctarget " with flags:" $cflags;
+        make $ctarget $cflags >> /dev/null;
+        if [ $? -eq 0 ];
+        then
+            echo "----> Success!"
+        else
+            echo "----> Compilation error!"; exit;
+        fi;
+        echo "----> Moving binaries to $ub";
+        mkdir $ub &> /dev/null;
+        bins=$(ls bin/*${ds}*);
+        for b in $bins;
+        do
+            target=$(echo $ub/${b}"_"$WORKLOAD"_stats" | sed 's/bin\///2g');
+            mv $b $target;
+        done
+        if [ $? -eq 0 ];
+        then
+            echo "----> Success!"
+        else
+            echo "----> Cannot mv executables in $ub!"; exit;
+        fi;
+    done;
+    exit 1;
 fi;
 
-cores=$cores_backup;
-algos_str="${algos[@]}";
 
+for ((i=0; i < $np; i++))
+do
+    initial=${params_i[$i]};
+    update=${params_u[$i]};
+    range=$((2*$initial));
 
-if [ $do_thr -eq 1 ];
-then
+    workload=${params_w[$i]};
+    suffix="_stats"
 
-    if [ $do_compile -eq 1 ];
+    if [ "${workload}0" = "0" ];
     then
-	ctarget=tsx${ds};
-	cflags="SET_CPU=$set_cpu TSX_STATS=1";
-	echo "----> Compiling" $ctarget " with flags:" $cflags;
-	make $ctarget $cflags >> /dev/null;
-	if [ $? -eq 0 ];
-	then
-	    echo "----> Success!"
-	fi;
-	echo "----> Moving binaries to $ub";
-	mkdir $ub &> /dev/null;
-	mv bin/*${ds}* $ub;
-	if [ $? -eq 0 ];
-	then
-	    echo "----> Success!"
-	fi;
+	workload=0;
     fi;
 
-    for ((i=0; i < $np; i++))
-    do
-	initial=$param_i;
-	put=${params_p[$i]};
-	if [ $fixed_file_dat -ne 1 ];
-	then
-	    out="$unm.stats.${ds}.i$initial.p$put.w0.dat"
-	else
-	    out="data.stats.${ds}.i$initial.p$put.w0.dat"
-	fi;
+    algos_w=( "${algos[@]/%/_$workload$suffix}" )
+    algos_str="${algos_w[@]}";
 
-	echo "### params -i$initial -p$put / keep $keep of reps $repetitions of dur $duration" | tee ${uo}/$out;
+    if [ $fixed_file_dat -ne 1 ];
+    then
+	out="$unm.stats.${ds}.i$initial.u$update.w$workload.dat"
+    else
+	out="data.stats.${ds}.i$initial.u$update.w$workload.dat"
+    fi;
 
-	./scripts/tsx_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -p$put \
-	    | tee -a ${uo}/$out;
-    done;
-fi
+    echo "### params -i$initial -r$range -u$update / keep $keep of reps $repetitions of dur $duration" | tee ${uo}/$out;
+    ./scripts/tsx_rep_simple.sh $cores $repetitions $keep "$algos_str" -d$duration -i$initial -r$range -u$update \
+				 | tee -a ${uo}/$out;
+done;
