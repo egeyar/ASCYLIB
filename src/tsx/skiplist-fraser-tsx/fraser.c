@@ -216,37 +216,28 @@ fraser_insert(sl_intset_t *set, skey_t key, sval_t val)
 #endif
 
   /*Try transactionalization*/
-  int _xbegin_tries = 3;
-  int t;
-  for (t = 0; t < _xbegin_tries; t++)
+  TSX_CRITICAL_SECTION
   {
-    long status;
-    if ((status = _xbegin()) == _XBEGIN_STARTED)
+    for (i = 0; i < new->toplevel; i++)
     {
-      for (i = 0; i < new->toplevel; i++)
+      if (i && succs[i]->key == key)
       {
-        if (preds[i]->next[i] != succs[i])
-        {
-          _xabort(0xff);
-        }
-        preds[i]->next[i] = new;
+        succ = (sl_node_t *)unset_mark((uintptr_t) succs[i]->next);
       }
-      _xend();
-      goto success;
+      else
+      {
+        succ = succs[i];
+      }
+      if (preds[i]->next[i] != succ)
+      {
+        TSX_ABORT;
+      }
+      preds[i]->next[i] = new;
     }
-    else
-    {
-      if (status & _XABORT_EXPLICIT)
-      {
-        goto retry;
-      }
-      if (!(status & _XABORT_RETRY))
-      {
-        break;
-      }
-      PAUSE;
-    }
+    TSX_COMMIT;
+    goto success;
   }
+  TSX_AFTER;
 
   /*Transactionalization is failed*/
   /* Node is visible once inserted at lowest level */
