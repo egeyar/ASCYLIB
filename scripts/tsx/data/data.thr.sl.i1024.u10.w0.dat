@@ -1,0 +1,6 @@
+### params -i1024 -r2048 -u10 / keep median of reps 1 of dur 2000
+# Result from 1 repetitions: median
+#       lpdquadlb-sl_herlihy_0 lpdquadtsx-sl_herlihy_0 lpdquadlf-sl_fraser_0 lpdquadtsx-sl_fraser_cas_0 lpdquadtsx-sl_fraser_tsx_0 lpdquadlb-sl_pugh_0 lpdquadtsx-sl_pugh_0 
+#cores  throughput   throughput   throughput   throughput   throughput   throughput   throughput   
+1       9383058      9424262      7903692      7867248      8144470      9056100      9552677      
+2       14547503     14138131     12545324     12418387     12960344     14235850     14329495     
