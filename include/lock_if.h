@@ -273,13 +273,10 @@ typedef volatile UTYPE ptlock_t;
 #  define GL_TRYLOCK(lock)                              tsx_trylock(lock)
 #  define GL_UNLOCK(lock)                               tsx_unlock(lock)
 
-static __thread uint64_t tsx_depth = 0;
-#define TSX_DEPTH_INC() // tsx_depth++
-#define TSX_DEPTH_DEC() // tsx_depth--
-
 #  define TAS_FREE 0
 #  define TAS_LCKD 1
 #  define TSX_TRIES 3
+
 
 #  ifdef TSX_STATS
 #    define TSX_STATS_VARS \
@@ -291,9 +288,10 @@ extern __thread ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
-#    define TSX_STATS_ABORTS(i)  my_tsx_aborts[i]++
-#    define TSX_STATS_TRIALS(i)  my_tsx_trials[i]++
-#    define TSX_STATS_COMMITS()  my_tsx_commits++
+
+#    define TSX_STATS_ABORTS(i)    (my_tsx_aborts[i]++)
+#    define TSX_STATS_TRIALS(i)    (my_tsx_trials[i]++)
+#    define TSX_STATS_COMMITS()    (my_tsx_commits++)
 #  else /*if !defined TSX_STATS*/
 #    define TSX_STATS_VARS
 #    define EXTERN_TSX_STATS_VARS
@@ -302,14 +300,33 @@ EXTERN_TSX_STATS_VARS;
 #    define TSX_STATS_COMMITS()
 #  endif
 
+
+#  ifndef TSX_NESTED_TXN
+static __thread uint64_t tsx_depth = 0;
+#    define TSX_DEPTH_INC()              (tsx_depth++)
+#    define TSX_DEPTH_DEC()              (tsx_depth--)
+#    define TSX_IS_COMMITTABLE()         (tsx_depth == 1)
+#    define TSX_USE_CURRENT_TXN()        (tsx_depth > 1)
+#  else /* if defined TSX_MULTIPLE_TXN */
+#    define TSX_DEPTH_INC()
+#    define TSX_DEPTH_DEC()
+#    define TSX_IS_COMMITTABLE()         (1)
+#    define TSX_USE_CURRENT_TXN()        (0)
+#  endif
+
+
 #  define TSX_CRITICAL_SECTION                 \
 long status;                                   \
 int t;                                         \
 for (t = 0; t < TSX_TRIES; t++)                \
 {                                              \
-  TSX_STATS_TRIALS(t);                         \
   TSX_DEPTH_INC();                             \
-  if (/*tsx_depth > 1 ||*/ (status = _xbegin()) == _XBEGIN_STARTED)
+  if (!TSX_USE_CURRENT_TXN())                  \
+  {                                            \
+    TSX_STATS_TRIALS(t);                       \
+  }                                            \
+  if (TSX_USE_CURRENT_TXN() ||                 \
+      (status = _xbegin()) == _XBEGIN_STARTED)
 
 #  define TSX_AFTER                            \
   else                                         \
@@ -331,7 +348,7 @@ for (t = 0; t < TSX_TRIES; t++)                \
 #  define TSX_ABORT  _xabort(0xff);
 
 #  define TSX_COMMIT                           \
-if (/*tsx_depth ==*/ 1) {                          \
+if (TSX_IS_COMMITTABLE()) {                    \
   _xend();                                     \
   TSX_STATS_COMMITS();                         \
 }                                              \

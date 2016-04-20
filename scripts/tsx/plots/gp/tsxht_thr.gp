@@ -67,7 +67,7 @@ FILE2 = '"data/data.thr.ht.i512.u10.w0.dat"'
 unset xlabel
 unset key
 set xtics 20 font ",18"
-set ytics 100 font ",18"
+#set ytics 100 font ",18"
 
 set size plot_size_x, plot_size_y
 set multiplot layout 5, 2
@@ -80,7 +80,7 @@ set lmargin 3
 set origin 0.0 + graphs_x_offs, top_row_y
 set title @PLOT0 offset 0.2, title_offset
 set ylabel 'Throughput (Mops/s)' offset 2,-0.5 font ",22"
-#set ytics 0.2 0.4
+set ytics 200 font ",18"
 plot for [i=1:n_algo] @FILE0 using ($1):(column_select(i)) ls i with linespoints
 
 set origin 0.5 + graphs_x_offs, top_row_y
@@ -90,7 +90,7 @@ set lmargin 4
 set ylabel ""
 unset ylabel
 set title @PLOT1
-#set ytics 0.2 2
+set ytics 200 font ",18"
 plot for [i=1:n_algo] @FILE1 using ($1):(column_select(i)) ls i with linespoints
 
 set origin 1.0 + graphs_x_offs, top_row_y
@@ -100,7 +100,7 @@ set lmargin 4
 set ylabel ""
 unset ylabel
 set title @PLOT2
-#set ytics 0.2 2
+set ytics 100 font ",18"
 plot for [i=1:n_algo] @FILE2 using ($1):(column_select(i)) ls i with linespoints
 
 
