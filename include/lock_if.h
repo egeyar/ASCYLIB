@@ -315,6 +315,22 @@ static __thread uint64_t tsx_depth = 0;
 #  endif
 
 
+#  ifdef TSX_PREFETCH
+#    define TSX_PREFETCH_BEGIN()               \
+       if (_xbegin() == _XBEGIN_STARTED)       \
+       {
+#    define TSX_PREFETCH_FETCH(x)              \
+         (x=0)
+#    define TSX_PREFETCH_END()                 \
+         _xabort(0xff);                        \
+       }
+#  else
+#    define TSX_PREFETCH_BEGIN()
+#    define TSX_PREFETCH_FETCH(x)
+#    define TSX_PREFETCH_END()
+#  endif 
+
+
 #  define TSX_CRITICAL_SECTION                 \
 long status;                                   \
 int t;                                         \
@@ -363,10 +379,14 @@ tsx_init(ptlock_t* l)
   MEM_BARRIER;
 #  endif
 }
-
+  
 static inline uint32_t
 tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newValue)
 {
+  TSX_PREFETCH_BEGIN();
+  TSX_PREFETCH_FETCH(*addr);
+  TSX_PREFETCH_END();
+
   TSX_CRITICAL_SECTION
   {
     if (*addr != oldValue)
@@ -385,6 +405,10 @@ tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newVal
 static inline uint64_t
 tsx_CAS_PTR(volatile uint64_t * addr, volatile uint64_t oldValue, volatile uint64_t newValue)
 {
+  TSX_PREFETCH_BEGIN();
+  TSX_PREFETCH_FETCH(*addr);
+  TSX_PREFETCH_END();
+
   TSX_CRITICAL_SECTION
   {
     if (*addr != oldValue)

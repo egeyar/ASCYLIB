@@ -341,6 +341,10 @@ ifeq ($(TSX_NESTED_TXN),1)
 	CFLAGS += -DTSX_NESTED_TXN
 endif
 
+ifeq ($(TSX_PREFETCH),1)
+	CFLAGS += -DTSX_PREFETCH
+endif
+
 ifeq ($(POWER),1)
 	CFLAGS += -DRAPL_READ_ENABLE=1
 	ifeq ($(PLATFORM_NUMA), 1)

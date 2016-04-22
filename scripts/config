@@ -364,4 +364,7 @@ then
 elif [ "$cores" = "twelve" ];
 then
     cores=$(seq 2 1 12);
+elif [ "$cores" = "48x" ];
+then
+    cores=$(seq 48 48 96);
 fi;
