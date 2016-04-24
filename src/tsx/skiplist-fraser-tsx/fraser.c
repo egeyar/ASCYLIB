@@ -215,6 +215,14 @@ fraser_insert(sl_intset_t *set, skey_t key, sval_t val)
   MEM_BARRIER;
 #endif
 
+  TSX_PREFETCH_BEGIN();
+  for (i = 0; i < new->toplevel; i++)
+  {
+    TSX_PREFETCH_FETCH_R(succs[i]);
+    TSX_PREFETCH_FETCH_W(preds[i]);
+  }
+  TSX_PREFETCH_END();
+
   /*Try transactionalization*/
   TSX_CRITICAL_SECTION
   {

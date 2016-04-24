@@ -366,5 +366,5 @@ then
     cores=$(seq 2 1 12);
 elif [ "$cores" = "48x" ];
 then
-    cores=$(seq 48 48 96);
+    cores=$(seq 24 24 96);
 fi;

@@ -237,6 +237,12 @@ harris_delete(intset_t *set, skey_t key)
       if (!is_marked_ref((long) right_node_next))
         {
 
+          TSX_PREFETCH_BEGIN();
+          TSX_PREFETCH_FETCH_R(&right_node_next);
+          TSX_PREFETCH_FETCH_W(right_node);
+          TSX_PREFETCH_FETCH_W(left_node);
+          TSX_PREFETCH_END();
+
           TSX_CRITICAL_SECTION
             {
               if (right_node->next != right_node_next || left_node->next != right_node)

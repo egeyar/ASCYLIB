@@ -315,20 +315,28 @@ static __thread uint64_t tsx_depth = 0;
 #  endif
 
 
-#  ifdef TSX_PREFETCH
+#  ifdef TSX_PREFETCH_TXN
 #    define TSX_PREFETCH_BEGIN()               \
        if (_xbegin() == _XBEGIN_STARTED)       \
        {
-#    define TSX_PREFETCH_FETCH(x)              \
-         (x=0)
+#    define TSX_PREFETCH_FETCH_R(x)            \
+         (x == 0);
+#    define TSX_PREFETCH_FETCH_W(x)            \
+         (x = 0);
 #    define TSX_PREFETCH_END()                 \
          _xabort(0xff);                        \
        }
+#  elif defined TSX_PREFETCH
+#    define TSX_PREFETCH_BEGIN()
+#    define TSX_PREFETCH_FETCH_R(x)   asm volatile("prefetch %0" :: "m" (*(unsigned long *)x))
+#    define TSX_PREFETCH_FETCH_W(x)   asm volatile("prefetchw %0" :: "m" (*(unsigned long *)x))
+#    define TSX_PREFETCH_END()
 #  else
 #    define TSX_PREFETCH_BEGIN()
-#    define TSX_PREFETCH_FETCH(x)
+#    define TSX_PREFETCH_FETCH_R(x)
+#    define TSX_PREFETCH_FETCH_W(x)
 #    define TSX_PREFETCH_END()
-#  endif 
+#  endif
 
 
 #  define TSX_CRITICAL_SECTION                 \
@@ -384,7 +392,7 @@ static inline uint32_t
 tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newValue)
 {
   TSX_PREFETCH_BEGIN();
-  TSX_PREFETCH_FETCH(*addr);
+  TSX_PREFETCH_FETCH_W(addr);
   TSX_PREFETCH_END();
 
   TSX_CRITICAL_SECTION
@@ -406,7 +414,7 @@ static inline uint64_t
 tsx_CAS_PTR(volatile uint64_t * addr, volatile uint64_t oldValue, volatile uint64_t newValue)
 {
   TSX_PREFETCH_BEGIN();
-  TSX_PREFETCH_FETCH(*addr);
+  TSX_PREFETCH_FETCH_W(addr);
   TSX_PREFETCH_END();
 
   TSX_CRITICAL_SECTION

@@ -61,14 +61,22 @@ search_weak_right(intset_l_t* set, skey_t key)
 static inline node_l_t*
 search_strong(intset_l_t* set, skey_t key, node_l_t** right)
 {
-  node_l_t* pred = search_weak_left(set, key);
+  node_l_t* pred = search_weak_left(set, key), *succ;
+
+  TSX_PREFETCH_BEGIN();
+  TSX_PREFETCH_FETCH_R(pred);
+  TSX_PREFETCH_FETCH_W(right);
+  TSX_PREFETCH_FETCH_W(succ);
+  TSX_PREFETCH_END();
+
   GL_LOCK(set->lock);
   LOCK(ND_GET_LOCK(pred));
-  node_l_t* succ = pred->next;
+  succ = pred->next;
   while (unlikely(succ->key < key))
     {
       UNLOCK(ND_GET_LOCK(pred));
       pred = succ;
+
       LOCK(ND_GET_LOCK(pred));
       succ = pred->next;
     }
@@ -85,6 +93,12 @@ search_strong_cond(intset_l_t* set, skey_t key, node_l_t** right, int equal)
     {
       return 0;
     }
+
+  TSX_PREFETCH_BEGIN();
+  TSX_PREFETCH_FETCH_R(pred);
+  TSX_PREFETCH_FETCH_W(right);
+  TSX_PREFETCH_FETCH_W(succ);
+  TSX_PREFETCH_END();
 
   GL_LOCK(set->lock);
   LOCK(ND_GET_LOCK(pred));
