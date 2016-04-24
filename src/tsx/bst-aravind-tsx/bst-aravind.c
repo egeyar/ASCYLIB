@@ -266,6 +266,13 @@ bool_t bst_cleanup(skey_t key) {
 
     node_t* untagged = *sibling_addr;
     node_t* tagged = (node_t*)TAG(untagged);
+
+    TSX_PREFETCH_BEGIN();
+    TSX_PREFETCH_FETCH_R(&tagged);
+    TSX_PREFETCH_FETCH_W(sibling_addr);
+    TSX_PREFETCH_FETCH_W(succ_addr);
+    TSX_PREFETCH_END();
+
     TSX_CRITICAL_SECTION {
         if (*sibling_addr != untagged || *succ_addr != ADDRESS(successor)) {
             TSX_ABORT;

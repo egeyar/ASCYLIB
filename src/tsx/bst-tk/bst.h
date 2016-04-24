@@ -67,6 +67,11 @@ typedef union tl
 static inline int
 tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
 {
+  TSX_PREFETCH_BEGIN();
+  TSX_PREFETCH_FETCH_R(tl_old);
+  TSX_PREFETCH_FETCH_W(tl);
+  TSX_PREFETCH_END();
+
   TSX_CRITICAL_SECTION
     {
       if (likely(tl_old->lr[right].ticket == tl_old->lr[right].version
