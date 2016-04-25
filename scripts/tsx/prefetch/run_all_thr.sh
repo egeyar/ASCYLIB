@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sf=./scripts/tsx
+sf=./scripts/tsx/prefetch
 
 file=$1;
 if [ -f "$file" ];
@@ -9,7 +9,7 @@ then
     . $file;
     skip=0;
 else
-. ./scripts/tsx/run.config;
+. ./scripts/tsx/prefetch/run.config;
 fi;
 
 pinclude=./include/utils.h;
