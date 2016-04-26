@@ -14,7 +14,7 @@ set lmargin 3
 set tmargin 3
 set bmargin 2.5
 
-n_algo = 7
+n_algo = 8
 
 title_offset   = -0.5
 top_row_y      = 1.76
@@ -34,11 +34,12 @@ column_select(i) = column(FIRST + ((i-1)*OFFSET)) / (DIV);
 
 LINE0 = '"tsx-harris-cas"'
 LINE1 = '"tsx-harris"'
-LINE2 = '"harris"'
-LINE3 = '"tsx-lazy"'
-LINE4 = '"lazy"'
-LINE5 = '"tsx-pugh"'
-LINE6 = '"pugh"'
+LINE2 = '"tsx"'
+LINE3 = '"harris"'
+LINE4 = '"tsx-lazy"'
+LINE5 = '"lazy"'
+LINE6 = '"tsx-pugh"'
+LINE7 = '"pugh"'
 
 PLOT0 = '"Low Contention\n{(8192 elements)}"'
 PLOT1 = '"Medium contention\n{(1024 elements)}"'

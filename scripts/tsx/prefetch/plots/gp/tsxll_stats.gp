@@ -17,15 +17,13 @@ set bmargin 2.5
 n_algo = 4
 
 title_offset   = -0.5
-top_row_y      = 1.76
-top_mid_row_y  = 1.32
-mid_row_y      = 0.88
-bot_mid_row_y  = 0.44
+top_row_y      = 0.88
+mid_row_y      = 0.44
 bottom_row_y   = 0.0
 graphs_x_offs  = 0.1
 graphs_y_offs  = 0.0
 plot_size_x    = 1.65
-plot_size_y    = 2.44
+plot_size_y    = 1.70
 
 MULTIPLIER       =    100
 FIRST            =    1
@@ -38,6 +36,14 @@ LINE0 = '"tsx-harris-cas"'
 LINE1 = '"tsx-harris"'
 LINE2 = '"tsx-lazy"'
 LINE3 = '"tsx-pugh"'
+LINE4 = '"tsx-harris-cas-pf1"'
+LINE5 = '"tsx-harris-pf1"'
+LINE6 = '"tsx-lazy-pf1"'
+LINE7 = '"tsx-pugh-pf1"'
+LINE8 = '"tsx-harris-cas-pf2"'
+LINE9 = '"tsx-harris-pf2"'
+LINE10 = '"tsx-lazy-pf2"'
+LINE11 = '"tsx-pugh-pf2"'
 
 PLOT0 = '"Low Contention\n{/*0.8(8192 elements)}"'
 PLOT1 = '"Medium contention\n{/*0.8(1024 elements)}"'
@@ -45,9 +51,7 @@ PLOT2 = '"High contention\n{/*0.8(64 elements)}"'
 
 # font "Helvetica Bold"
 set label 1 "10% Updates" at screen 0.018, screen 0.1+top_row_y      rotate by 90 font ',30' textcolor rgb "red"
-set label 2 "20% Updates" at screen 0.018, screen 0.1+top_mid_row_y  rotate by 90 font ',30' textcolor rgb "red"
 set label 3 "40% Updates" at screen 0.018, screen 0.1+mid_row_y      rotate by 90 font ',30' textcolor rgb "red"
-set label 4 "60% Updates" at screen 0.018, screen 0.1+bot_mid_row_y  rotate by 90 font ',30' textcolor rgb "red"
 set label 5 "80% Updates" at screen 0.018, screen 0.1+bottom_row_y   rotate by 90 font ',30' textcolor rgb "red"
 
 
@@ -56,13 +60,19 @@ set label 5 "80% Updates" at screen 0.018, screen 0.1+bottom_row_y   rotate by 9
 # ##########################################################################################
 
 
-FILE0 = '"data/data.stats.ll.i8192.u10.w0.dat"'
-FILE1 = '"data/data.stats.ll.i1024.u10.w0.dat"'
-FILE2 = '"data/data.stats.ll.i64.u10.w0.dat"'
+FILE0 = '"data/data.stats.ll.i8192.u10.pf0.dat"'
+FILE1 = '"data/data.stats.ll.i1024.u10.pf0.dat"'
+FILE2 = '"data/data.stats.ll.i64.u10.pf0.dat"'
+FILE3 = '"data/data.stats.ll.i8192.u10.pf1.dat"'
+FILE4 = '"data/data.stats.ll.i1024.u10.pf1.dat"'
+FILE5 = '"data/data.stats.ll.i64.u10.pf1.dat"'
+FILE6 = '"data/data.stats.ll.i8192.u10.pf2.dat"'
+FILE7 = '"data/data.stats.ll.i1024.u10.pf2.dat"'
+FILE8 = '"data/data.stats.ll.i64.u10.pf2.dat"'
 
 unset xlabel
 unset key
-set xtics 20 
+set xtics 20
 
 set size plot_size_x, plot_size_y
 set multiplot layout 5, 2
@@ -76,7 +86,9 @@ set origin 0.0 + graphs_x_offs, top_row_y + graphs_y_offs
 set title @PLOT0 offset 0.2, title_offset
 set ylabel 'Commit Rate (%)' offset 2,-0.5 font ",22"
 #set ytics 94 1
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE3 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE6 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 set origin 0.5 + graphs_x_offs, top_row_y + graphs_y_offs
 @PSIZE
@@ -86,7 +98,9 @@ set ylabel ""
 unset ylabel
 set title @PLOT1
 #set ytics 65 5
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE4 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE7 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 set origin 1.0 + graphs_x_offs, top_row_y + graphs_y_offs
 @PSIZE
@@ -96,54 +110,24 @@ set ylabel ""
 unset ylabel
 set title @PLOT2
 #set ytics 40 10
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
-
-
-# ##########################################################################################
-# 20% Updates ##############################################################################
-# ##########################################################################################
-
-FILE0 = '"data/data.stats.ll.i8192.u20.w0.dat"'
-FILE1 = '"data/data.stats.ll.i1024.u20.w0.dat"'
-FILE2 = '"data/data.stats.ll.i64.u20.w0.dat"'
-
-unset title
-
-set lmargin 3
-@PSIZE
-set origin 0.0 + graphs_x_offs, top_mid_row_y + graphs_y_offs
-#set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 2,-0.5 font ",22"
-#set ytics 94 1
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
-
-set origin 0.5 + graphs_x_offs, top_mid_row_y + graphs_y_offs
-@PSIZE
-set lmargin 4
-@YTICS
-set ylabel ""
-unset ylabel
-#set title @PLOT1
-#set ytics 65 5
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
-
-set origin 1.0 + graphs_x_offs, top_mid_row_y + graphs_y_offs
-@PSIZE
-@YTICS
-set ylabel ""
-unset ylabel
-#set title @PLOT2
-#set ytics 40 10
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE5 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE8 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 
 # ##########################################################################################
 # 40% Updates ##############################################################################
 # ##########################################################################################
 
-FILE0 = '"data/data.stats.ll.i8192.u40.w0.dat"'
-FILE1 = '"data/data.stats.ll.i1024.u40.w0.dat"'
-FILE2 = '"data/data.stats.ll.i64.u40.w0.dat"'
+FILE0 = '"data/data.stats.ll.i8192.u40.pf0.dat"'
+FILE1 = '"data/data.stats.ll.i1024.u40.pf0.dat"'
+FILE2 = '"data/data.stats.ll.i64.u40.pf0.dat"'
+FILE3 = '"data/data.stats.ll.i8192.u40.pf1.dat"'
+FILE4 = '"data/data.stats.ll.i1024.u40.pf1.dat"'
+FILE5 = '"data/data.stats.ll.i64.u40.pf1.dat"'
+FILE6 = '"data/data.stats.ll.i8192.u40.pf2.dat"'
+FILE7 = '"data/data.stats.ll.i1024.u40.pf2.dat"'
+FILE8 = '"data/data.stats.ll.i64.u40.pf2.dat"'
 
 unset title
 
@@ -153,7 +137,10 @@ set origin 0.0 + graphs_x_offs, mid_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
 set ylabel 'Commit Rate (%)' offset 2,-0.5 font ",22"
 #set ytics 94 1
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE3 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE6 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
+
 
 set origin 0.5 + graphs_x_offs, mid_row_y + graphs_y_offs
 @PSIZE
@@ -163,7 +150,10 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 #set ytics 65 5
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE4 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE7 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
+
 
 set origin 1.0 + graphs_x_offs, mid_row_y + graphs_y_offs
 @PSIZE
@@ -172,55 +162,25 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 #set ytics 40 10
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE5 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE8 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
-
-
-# ##########################################################################################
-# 60% Updates ##############################################################################
-# ##########################################################################################
-
-FILE0 = '"data/data.stats.ll.i8192.u60.w0.dat"'
-FILE1 = '"data/data.stats.ll.i1024.u60.w0.dat"'
-FILE2 = '"data/data.stats.ll.i64.u60.w0.dat"'
-
-unset title
-
-set lmargin 3
-@PSIZE
-set origin 0.0 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
-#set title @PLOT0 offset 0.2,title_offset
-set ylabel 'Commit Rate (%)' offset 2,-0.5 font ",22"
-#set ytics 94 1
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
-
-set origin 0.5 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
-@PSIZE
-set lmargin 4
-@YTICS
-set ylabel ""
-unset ylabel
-#set title @PLOT1
-#set ytics 65 5
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
-
-set origin 1.0 + graphs_x_offs, bot_mid_row_y + graphs_y_offs
-@PSIZE
-@YTICS
-set ylabel ""
-unset ylabel
-#set title @PLOT2
-#set ytics 40 10
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
 
 
 # ##########################################################################################
 # 80% Updates ##############################################################################
 # ##########################################################################################
 
-FILE0 = '"data/data.stats.ll.i8192.u80.w0.dat"'
-FILE1 = '"data/data.stats.ll.i1024.u80.w0.dat"'
-FILE2 = '"data/data.stats.ll.i64.u80.w0.dat"'
+FILE0 = '"data/data.stats.ll.i8192.u80.pf0.dat"'
+FILE1 = '"data/data.stats.ll.i1024.u80.pf0.dat"'
+FILE2 = '"data/data.stats.ll.i64.u80.pf0.dat"'
+FILE3 = '"data/data.stats.ll.i8192.u80.pf1.dat"'
+FILE4 = '"data/data.stats.ll.i1024.u80.pf1.dat"'
+FILE5 = '"data/data.stats.ll.i64.u80.pf1.dat"'
+FILE6 = '"data/data.stats.ll.i8192.u80.pf2.dat"'
+FILE7 = '"data/data.stats.ll.i1024.u80.pf2.dat"'
+FILE8 = '"data/data.stats.ll.i64.u80.pf2.dat"'
 
 set xlabel "# Threads" offset 0.0, 0.51 font ",22"
 

@@ -15,7 +15,7 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/tsx-ll_pugh);
+algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/tsx-ll_pugh ${ub}/tsx-ll_tsx );
 
 params_i=( 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 );
 params_u=( 80 80   80   60 60   60   40 40   40   20 20   20   10 10   10   );
