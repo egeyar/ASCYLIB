@@ -95,9 +95,10 @@ search_strong_cond(intset_l_t* set, skey_t key, node_l_t** right, int equal)
     }
 
   TSX_PREFETCH_BEGIN();
-  TSX_PREFETCH_FETCH_R(pred);
+  TSX_PREFETCH_FETCH_R(&pred->next);
+  TSX_PREFETCH_FETCH_R(&succ->key);
+  TSX_PREFETCH_FETCH_W(&succ);
   TSX_PREFETCH_FETCH_W(right);
-  TSX_PREFETCH_FETCH_W(succ);
   TSX_PREFETCH_END();
 
   GL_LOCK(set->lock);

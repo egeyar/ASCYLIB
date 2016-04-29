@@ -241,7 +241,7 @@ seqllgc:
 
 lfll: lfll_harris lfll_michael lfll_harris_opt
 lbll: seqll llcopy lbll_coupling lbll_gl lbll_pugh lbll_lazy lbll_lazy_sp lbll_lazy_orig lbll_lazy_cache lbll_lazy_no_ro lbll_optik lbll_optik_no_ro llcopy_no_ro lbll_pugh_no_ro
-tsxll: tsxll_lazy tsxll_harris tsxll_harris_tsx tsxll_harris_cas lfll_harris lbll_lazy lbll_pugh tsxll_pugh tsxll_tsx
+tsxll: tsxll_lazy tsxll_harris tsxll_harris_tsx tsxll_harris_cas lfll_harris lbll_lazy lbll_pugh tsxll_pugh #tsxll_tsx
 ll: seqll lfll llcopy lbll_coupling lbll_gl lbll_pugh lbll_lazy lbll_lazy_no_ro lbll_optik lbll_optik_no_ro llcopy_no_ro lbll_pugh_no_ro tsxll
 
 llppopp: lfll_harris_opt lbll_lazy lbll_lazy_cache lbll_gl lbll_optik_gl lbll_optik lbll_optik_cache

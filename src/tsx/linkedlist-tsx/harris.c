@@ -25,6 +25,9 @@
 #include "harris.h"
 
 RETRY_STATS_VARS;
+#ifdef TSX_STATS
+TSX_STATS_VARS;
+#endif
 
 /*
  * The five following functions handle the low-order mark bit that indicates
@@ -83,23 +86,15 @@ node_t*
 ege_search(intset_t *set, skey_t key, node_t **left_node) 
 {
   node_t *prev, *next;
-	
-  do {
   prev = set->head;
   next = prev->next;
-  TSX_CRITICAL_SECTION
+  while (next->key < key) 
     {
-      while (next->key < key) 
-        {
-          prev = next;
-          next = prev->next;
-        }
-      *left_node = prev;
-      TSX_COMMIT;
-      return next;
+      prev = next;
+      next = prev->next;
     }
-  TSX_AFTER;
-  } while(1);
+  *left_node = prev;
+  return next;
 }
 
 /*
@@ -109,21 +104,14 @@ sval_t
 ege_find(intset_t *set, skey_t key) 
 {
   node_t *prev, *next;
-	
-  do {
   prev = set->head;
   next = prev->next;
-  TSX_CRITICAL_SECTION
-    {
   while (next->key < key) 
     {
       prev = next;
       next = prev->next;
     }
-    TSX_COMMIT;
   return (next->key == key) ? next->val : 0;
-  } TSX_AFTER
-  } while(1);
 }
 
 /*
@@ -182,8 +170,8 @@ sval_t
 ege_delete(intset_t *set, skey_t key)
 {
   node_t *prev, *next = NULL;
-//  do
-//    {
+  do
+    {
       UPDATE_TRY();
       next = ege_search(set, key, &prev);
       if (next->key != key)
@@ -205,8 +193,8 @@ ege_delete(intset_t *set, skey_t key)
           return 1;
         }
       TSX_AFTER;
-//    }
-//  while(1);
+    }
+  while(1);
   return 0;
 }
 

@@ -91,8 +91,8 @@ parse_insert(intset_l_t *set, skey_t key, sval_t val)
 #endif
 
       TSX_PREFETCH_BEGIN();
-      TSX_PREFETCH_FETCH_R(curr);
-      TSX_PREFETCH_FETCH_W(pred);
+      TSX_PREFETCH_FETCH_R(&curr->key);
+      TSX_PREFETCH_FETCH_W(&pred->next);
       TSX_PREFETCH_END();
 
       GL_LOCK(set->lock);		/* when GL_[UN]LOCK is defined the [UN]LOCK is not ;-) */
@@ -149,8 +149,8 @@ parse_delete(intset_l_t *set, skey_t key)
 #endif
 
       TSX_PREFETCH_BEGIN();
-      TSX_PREFETCH_FETCH_W(curr);
-      TSX_PREFETCH_FETCH_W(pred);
+      TSX_PREFETCH_FETCH_W(&curr->key);
+      TSX_PREFETCH_FETCH_W(&pred->next);
       TSX_PREFETCH_END();
 
       GL_LOCK(set->lock);		/* when GL_[UN]LOCK is defined the [UN]LOCK is not ;-) */

@@ -316,16 +316,10 @@ static __thread uint64_t tsx_depth = 0;
 
 
 #  ifdef TSX_PREFETCH_TXN
-#    define TSX_PREFETCH_BEGIN()               \
-       if (_xbegin() == _XBEGIN_STARTED)       \
-       {
-#    define TSX_PREFETCH_FETCH_R(x)            \
-         (x == 0);
-#    define TSX_PREFETCH_FETCH_W(x)            \
-         (x = 0);
-#    define TSX_PREFETCH_END()                 \
-         _xabort(0xff);                        \
-       }
+#    define TSX_PREFETCH_BEGIN()
+#    define TSX_PREFETCH_FETCH_R(x)
+#    define TSX_PREFETCH_FETCH_W(x)   ATOMIC_CAS_MB(x, 0, 1)
+#    define TSX_PREFETCH_END()
 #  elif defined TSX_PREFETCH
 #    define TSX_PREFETCH_BEGIN()
 #    define TSX_PREFETCH_FETCH_R(x)   asm volatile("prefetch %0" :: "m" (*(unsigned long *)x))

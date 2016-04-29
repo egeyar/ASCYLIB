@@ -54,7 +54,7 @@ printf "           : = %-10.2f hours\n" $nht;
 echo "";
 echo "    (you can adjust the #repetitions and the duration in ./scripts/tsx/run.config";
 
-ds="ll sl ht bst";
+ds="ll sl";
 for d in $ds;
 do
     printf "######################## %-3s ############################################################\n" $d;

@@ -1,2 +1,2 @@
-./scripts/tsx/run_all_stats.sh
-./scripts/tsx/run_all_thr.sh
+./scripts/tsx/prefetch/run_all_stats.sh
+./scripts/tsx/prefetch/run_all_thr.sh
