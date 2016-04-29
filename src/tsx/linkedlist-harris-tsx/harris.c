@@ -238,9 +238,8 @@ harris_delete(intset_t *set, skey_t key)
         {
 
           TSX_PREFETCH_BEGIN();
-          TSX_PREFETCH_FETCH_R(&right_node_next);
-          TSX_PREFETCH_FETCH_W(right_node);
-          TSX_PREFETCH_FETCH_W(left_node);
+          TSX_PREFETCH_FETCH_W(&right_node->next);
+          TSX_PREFETCH_FETCH_W(&left_node->next);
           TSX_PREFETCH_END();
 
           TSX_CRITICAL_SECTION
