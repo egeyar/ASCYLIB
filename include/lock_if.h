@@ -278,6 +278,7 @@ typedef volatile UTYPE ptlock_t;
 #  define TSX_TRIES 3
 
 
+#  define TSX_STATS_DEPTH 3
 #  ifdef TSX_STATS
 #    define TSX_STATS_VARS \
 __thread ticks my_tsx_trials[3] = {0, 0, 0},   \
@@ -288,7 +289,6 @@ extern __thread ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
-
 #    define TSX_STATS_ABORTS(i)    (my_tsx_aborts[i]++)
 #    define TSX_STATS_TRIALS(i)    (my_tsx_trials[i]++)
 #    define TSX_STATS_COMMITS()    (my_tsx_commits++)
@@ -298,6 +298,48 @@ EXTERN_TSX_STATS_VARS;
 #    define TSX_STATS_ABORTS(i) 
 #    define TSX_STATS_TRIALS(i)
 #    define TSX_STATS_COMMITS()
+#  endif
+
+
+#  ifdef TSX_ABORT_REASONS
+#    define TSX_ABORT_REASONS_NUMBER 7
+#    define TSX_ABORT_REASONS_VARS                                     \
+            __thread ticks my_tsx_abort_reasons                        \
+              [TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]              \
+            = {{0, 0, 0, 0, 0, 0, 0},                                  \
+               {0, 0, 0, 0, 0, 0, 0},                                  \
+               {0, 0, 0, 0, 0, 0, 0}}
+#    define EXTERN_TSX_ABORT_REASONS_VARS                              \
+            extern __thread ticks my_tsx_abort_reasons                 \
+                     [TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]
+#    define TSX_ABORT_REASON(trial_no, status)                         \
+       if (! (status & (_XABORT_EXPLICIT  | _XABORT_CONFLICT           \
+                        | _XABORT_CONFLICT | _XABORT_DEBUG             \
+                        | _XABORT_NESTED)))                            \
+         my_tsx_abort_reasons[trial_no][5]++;                          \
+       else                                                            \
+       {                                                               \
+         if (status & _XABORT_EXPLICIT)                                \
+           my_tsx_abort_reasons[trial_no][0]++;                        \
+         if (status & _XABORT_CONFLICT)                                \
+           my_tsx_abort_reasons[trial_no][1]++;                        \
+         if (status & _XABORT_CAPACITY)                                \
+           my_tsx_abort_reasons[trial_no][2]++;                        \
+         if (status & _XABORT_DEBUG)                                   \
+           my_tsx_abort_reasons[trial_no][3]++;                        \
+         if (status & _XABORT_NESTED)                                  \
+           my_tsx_abort_reasons[trial_no][4]++;                        \
+       }                                                               \
+       if (status & _XABORT_RETRY)                                     \
+         my_tsx_abort_reasons[trial_no][6]++;
+
+
+EXTERN_TSX_ABORT_REASONS_VARS;
+
+#  else /* if !defined TSX_ABORT_REASONS */
+#    define TSX_ABORT_REASONS_VARS
+#    define EXTERN_TSX_ABORT_REASONS_VARS
+#    define TSX_ABORT_REASON(trial_no, reason)
 #  endif
 
 
@@ -346,20 +388,20 @@ for (t = 0; t < TSX_TRIES; t++)                \
   if (TSX_USE_CURRENT_TXN() ||                 \
       (status = _xbegin()) == _XBEGIN_STARTED)
 
+#  define TSX_IF_EXPLICIT_ABORT                \
+  if (status & _XABORT_EXPLICIT)
+
 #  define TSX_AFTER                            \
   else                                         \
   {                                            \
     TSX_DEPTH_DEC();                           \
     TSX_STATS_ABORTS(t);                       \
-    if (status & _XABORT_EXPLICIT)             \
-    {                                          \
+    TSX_ABORT_REASON(t, status);               \
+    TSX_IF_EXPLICIT_ABORT                      \
       break;                                   \
-    }                                          \
     if (!(status & _XABORT_RETRY))             \
-    {                                          \
       break;                                   \
-    }                                          \
-  pause_rep((1<<(t+1)) & 255);                 \
+    pause_rep((1<<((1+t)*5)) & 255);           \
   }                                            \
 }
 

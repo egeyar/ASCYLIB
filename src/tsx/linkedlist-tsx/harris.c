@@ -25,9 +25,8 @@
 #include "harris.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 /*
  * The five following functions handle the low-order mark bit that indicates
@@ -85,7 +84,8 @@ get_marked_ref(long w)
 node_t*
 ege_search(intset_t *set, skey_t key, node_t **left_node) 
 {
-  node_t *prev, *next;
+  node_t *prev;
+  volatile node_t volatile * volatile next;
   prev = set->head;
   next = prev->next;
   while (next->key < key) 
@@ -121,9 +121,32 @@ ege_find(intset_t *set, skey_t key)
 int
 ege_insert(intset_t *set, skey_t key, sval_t val) 
 {
+  int i=0;
   node_t *newnode = NULL, *prev, *next = NULL;
   do
     {
+      if (i==1000000) 
+        {
+          int j, k;
+          printf("Millionth time in the insertion loop\n");
+          for (j=0; j<3; j++)
+            for (k=0; k<7; k++)
+              my_tsx_abort_reasons[j][k] = 0;
+        }
+      else if (i==2000000)
+        {
+          int j;
+          printf("2Millionth time in the insertion loop\n");
+          printf("Abort reasons: %-12s %-12s %-12s %-12s %-12s %-12s | %-12s\n",
+                 "explicit", "conflict", "capacity", "debug trap", "nested txn", "other", "retry");
+          for (j=0; j<TSX_STATS_DEPTH; j++)
+            printf("Trial %d      : %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu | %-12lu\n",
+              j, my_tsx_abort_reasons[j][0], my_tsx_abort_reasons[j][1],
+              my_tsx_abort_reasons[j][2], my_tsx_abort_reasons[j][3],
+              my_tsx_abort_reasons[j][4], my_tsx_abort_reasons[j][5],
+              my_tsx_abort_reasons[j][6]);
+        }
+      i++;
       UPDATE_TRY();
       next = ege_search(set, key, &prev);
       if (next->key == key)
@@ -144,10 +167,13 @@ ege_insert(intset_t *set, skey_t key, sval_t val)
 	{
 	  newnode->next = next;
 	}
-      
+
+//      ATOMIC_CAS_MB(prev->next, 0, 1);
       TSX_CRITICAL_SECTION
         {
-          if (unlikely(prev->next != next))
+          /* The first condition is to check that they are still adjacent.
+           * The second one is to make sure that 'prev' is not marked deleted. */
+          if (unlikely(prev->next != next || prev->key > next->key))
             {
               TSX_ABORT;
             }
@@ -156,6 +182,8 @@ ege_insert(intset_t *set, skey_t key, sval_t val)
           return 1;
         }
       TSX_AFTER;
+      if (ATOMIC_CAS_MB(&prev->next, next, newnode))
+        return 1;
     }
   while(1);
   return 0;
@@ -169,15 +197,40 @@ ege_insert(intset_t *set, skey_t key, sval_t val)
 sval_t
 ege_delete(intset_t *set, skey_t key)
 {
-  node_t *prev, *next = NULL;
+  int i=0;
+  node_t *prev, *next = NULL, *next_next = NULL;
   do
     {
+      if (i==1000000) 
+        {
+          int j, k;
+          printf("Millionth time in the deletion loop\n");
+          for (j=0; j<3; j++)
+            for (k=0; k<7; k++)
+              my_tsx_abort_reasons[j][k] = 0;
+        }
+      else if (i==2000000)
+        {
+          int j;
+          printf("2Millionth time in the deletion loop\n");
+          printf("Abort reasons: %-12s %-12s %-12s %-12s %-12s %-12s | %-12s\n",
+                 "explicit", "conflict", "capacity", "debug trap", "nested txn", "other", "retry");
+          for (j=0; j<TSX_STATS_DEPTH; j++)
+            printf("Trial %d      : %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu | %-12lu\n",
+              j, my_tsx_abort_reasons[j][0], my_tsx_abort_reasons[j][1],
+              my_tsx_abort_reasons[j][2], my_tsx_abort_reasons[j][3],
+              my_tsx_abort_reasons[j][4], my_tsx_abort_reasons[j][5],
+              my_tsx_abort_reasons[j][6]);
+        }
+      i++;
       UPDATE_TRY();
       next = ege_search(set, key, &prev);
       if (next->key != key)
         {
           return 0;
-        }      
+        }
+      ATOMIC_CAS_MB(prev->next, 0, 1);
+      ATOMIC_CAS_MB(next->next, 0, 1);
       TSX_CRITICAL_SECTION
         {
           if (unlikely(prev->next != next))
@@ -185,7 +238,7 @@ ege_delete(intset_t *set, skey_t key)
               TSX_ABORT;
             }
           prev->next = next->next;
-          next->next = set->head;
+          next->next = prev;
           TSX_COMMIT;
 #if GC == 1
           ssmem_free(alloc, (void*) next);
@@ -193,6 +246,17 @@ ege_delete(intset_t *set, skey_t key)
           return 1;
         }
       TSX_AFTER;
+//      if (next_next == NULL)
+//          next_next = SWAP_PTR(&next->next, prev);
+      if (ATOMIC_CAS_MB(&prev->next, next, next->next))
+        {
+#if GC == 1
+//          ssmem_free(alloc, (void*) next);
+#endif
+//          printf("happens\n");
+//          fflush(stdout);
+          return 1;
+        }
     }
   while(1);
   return 0;

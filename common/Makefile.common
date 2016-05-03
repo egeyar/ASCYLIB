@@ -337,6 +337,11 @@ ifeq ($(TSX_STATS),1)
 	CFLAGS += -DTSX_STATS
 endif
 
+ifeq ($(TSX_ABORT_REASONS),1)
+	CFLAGS += -DTSX_STATS
+	CFLAGS += -DTSX_ABORT_REASONS
+endif
+
 ifeq ($(TSX_NESTED_TXN),1)
 	CFLAGS += -DTSX_NESTED_TXN
 endif

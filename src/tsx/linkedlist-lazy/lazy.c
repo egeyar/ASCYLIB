@@ -26,9 +26,8 @@
 #include "lazy.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 /*
  * Checking that both curr and pred are both unmarked and that pred's next pointer

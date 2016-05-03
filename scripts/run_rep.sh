@@ -16,6 +16,7 @@ execute=$@;
 
 for rep in $(seq 1 1 $reps)
 do
+     echo $rep;
      $run $execute
 done;
 
