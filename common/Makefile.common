@@ -335,9 +335,7 @@ endif
 
 ifeq ($(TSX_STATS),1)
 	CFLAGS += -DTSX_STATS
-endif
-
-ifeq ($(TSX_ABORT_REASONS),1)
+else ifeq ($(TSX_STATS),2)
 	CFLAGS += -DTSX_STATS
 	CFLAGS += -DTSX_ABORT_REASONS
 endif

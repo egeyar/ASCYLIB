@@ -388,17 +388,28 @@ for (t = 0; t < TSX_TRIES; t++)                \
   if (TSX_USE_CURRENT_TXN() ||                 \
       (status = _xbegin()) == _XBEGIN_STARTED)
 
-#  define TSX_IF_EXPLICIT_ABORT                \
-  if (status & _XABORT_EXPLICIT)
-
 #  define TSX_AFTER                            \
   else                                         \
   {                                            \
     TSX_DEPTH_DEC();                           \
     TSX_STATS_ABORTS(t);                       \
     TSX_ABORT_REASON(t, status);               \
-    TSX_IF_EXPLICIT_ABORT                      \
+    if (status & _XABORT_EXPLICIT)             \
       break;                                   \
+    if (!(status & _XABORT_RETRY))             \
+      break;                                   \
+    pause_rep((1<<((1+t)*5)) & 255);           \
+  }                                            \
+}
+
+#  define TSX_END_EXPLICIT_ABORTS_GOTO(x)      \
+  else                                         \
+  {                                            \
+    TSX_DEPTH_DEC();                           \
+    TSX_STATS_ABORTS(t);                       \
+    TSX_ABORT_REASON(t, status);               \
+    if (status & _XABORT_EXPLICIT)             \
+      goto x;                                  \
     if (!(status & _XABORT_RETRY))             \
       break;                                   \
     pause_rep((1<<((1+t)*5)) & 255);           \

@@ -121,6 +121,7 @@ new_delete(intset_t *set, skey_t key)
   node_t *prev, *next = NULL, *next_next = NULL;
   do
     {
+retry:
       UPDATE_TRY();
       next = new_search(set, key, &prev);
       if (next->key != key)
@@ -141,7 +142,7 @@ new_delete(intset_t *set, skey_t key)
 #endif
           return 1;
         }
-      TSX_AFTER;
+      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
 
       next_next = next->next;
       if (next->key > next_next->key
