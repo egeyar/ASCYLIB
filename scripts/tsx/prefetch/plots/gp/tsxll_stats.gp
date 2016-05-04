@@ -23,7 +23,7 @@ bottom_row_y   = 0.0
 graphs_x_offs  = 0.1
 graphs_y_offs  = 0.0
 plot_size_x    = 1.65
-plot_size_y    = 1.70
+plot_size_y    = 1.80
 
 MULTIPLIER       =    100
 FIRST            =    1
@@ -192,7 +192,9 @@ set origin 0.0 + graphs_x_offs, bottom_row_y + graphs_y_offs
 #set title @PLOT0 offset 0.2,title_offset
 set ylabel 'Commit Rate (%)' offset 2,-0.5 font ",22"
 set ytics 94 1
-plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE0 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE3 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE6 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 set origin 0.5 + graphs_x_offs, bottom_row_y + graphs_y_offs
 @PSIZE
@@ -202,7 +204,9 @@ set ylabel ""
 unset ylabel
 #set title @PLOT1
 set ytics 65 5
-plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE1 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE4 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE7 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 set origin 1.0 + graphs_x_offs, bottom_row_y + graphs_y_offs
 @PSIZE
@@ -211,7 +215,9 @@ set ylabel ""
 unset ylabel
 #set title @PLOT2
 set ytics 40 10
-plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints
+plot for [i=1:n_algo] @FILE2 using ($1):(commit_rate(i)) ls i with linespoints, \
+     for [i=1:n_algo] @FILE5 using ($1):(commit_rate(i)) ls i+n_algo with linespoints, \
+     for [i=1:n_algo] @FILE8 using ($1):(commit_rate(i)) ls i+2*n_algo with linespoints
 
 unset origin
 unset border
@@ -235,7 +241,7 @@ set key spacing 1.5
 set key horiz
 set key width -1
 set key samplen 2.5
-set key at screen 0.75, screen 2.43 center top
+set key at screen 0.75, screen 1.79 center top
 
 #We need to set an explicit xrange.  Anything will work really.
 set xrange [-1:1]
@@ -245,7 +251,15 @@ plot \
      NaN title @LINE0 ls 1 with linespoints, \
      NaN title @LINE1 ls 2 with linespoints, \
      NaN title @LINE2 ls 3 with linespoints, \
-     NaN title @LINE3 ls 4 with linespoints
+     NaN title @LINE3 ls 4 with linespoints, \
+     NaN title @LINE4 ls 5 with linespoints, \
+     NaN title @LINE5 ls 6 with linespoints, \
+     NaN title @LINE6 ls 7 with linespoints, \
+     NaN title @LINE7 ls 8 with linespoints, \
+     NaN title @LINE8 ls 9 with linespoints, \
+     NaN title @LINE9 ls 10 with linespoints, \
+     NaN title @LINE10 ls 11 with linespoints, \
+     NaN title @LINE11 ls 12 with linespoints
 
 #</null>
 unset multiplot  #<--- Necessary for some terminals, but not postscript I don't thin

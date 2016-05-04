@@ -104,20 +104,7 @@ new_insert(intset_t *set, skey_t key, sval_t val)
 	  newnode->next = next;
 	}
 
-/*      TSX_CRITICAL_SECTION
-        {
-          /* The first condition is to check that they are still adjacent.
-           * The second one is to make sure that 'prev' is not marked deleted. */
-/*          if (unlikely(prev->next != next))
-            {
-              TSX_ABORT;
-            }
-          prev->next = newnode;
-          TSX_COMMIT;
-          return 1;
-        }
-      TSX_AFTER;
-*/      if (ATOMIC_CAS_MB(&prev->next, next, newnode))
+      if (ATOMIC_CAS_MB(&prev->next, next, newnode))
           return 1;
     }
   while(1);
@@ -140,21 +127,6 @@ new_delete(intset_t *set, skey_t key)
         {
           return 0;
         }
-      TSX_CRITICAL_SECTION
-        {
-          if (unlikely(prev->next != next || next->key > next->next->key))
-            {
-              TSX_ABORT;
-            }
-          prev->next = next->next;
-          next->next = prev;
-          TSX_COMMIT;
-#if GC == 1
-          ssmem_free(alloc, (void*) next);
-#endif
-          return 1;
-        }
-      TSX_AFTER;
 
       next_next = next->next;
       if (next->key > next_next->key
