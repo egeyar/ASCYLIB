@@ -105,6 +105,9 @@ volatile ticks *tsx_trials[3];
 volatile ticks *tsx_commits;
 volatile ticks *tsx_aborts[3];
 #endif
+#if defined TSX_ABORT_REASONS
+volatile ticks *tsx_abort_reasons[TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER];
+#endif
 
 /* ################################################################### *
  * LOCALS
@@ -248,6 +251,13 @@ test(void* thread)
   tsx_aborts[1][ID] += my_tsx_aborts[1];
   tsx_aborts[2][ID] += my_tsx_aborts[2];
 #endif
+#ifdef TSX_ABORT_REASONS
+  int j;
+  for (i=0; i<TSX_STATS_DEPTH; i++)
+    for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
+      tsx_abort_reasons[i][j][ID] += my_tsx_abort_reasons[i][j];
+#endif
+
   putting_count[ID] += my_putting_count;
   getting_count[ID] += my_getting_count;
   removing_count[ID]+= my_removing_count;
@@ -468,6 +478,12 @@ main(int argc, char **argv)
   tsx_aborts[1] = (ticks *) calloc(num_threads, sizeof(ticks));
   tsx_aborts[2] = (ticks *) calloc(num_threads, sizeof(ticks));
 #endif
+#ifdef TSX_ABORT_REASONS 
+  int j;
+  for (i=0; i<TSX_STATS_DEPTH; i++)
+    for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
+      tsx_abort_reasons[i][j] = (ticks *) calloc(num_threads, sizeof(ticks));
+#endif
 
   pthread_t threads[num_threads];
   pthread_attr_t attr;
@@ -537,6 +553,10 @@ main(int argc, char **argv)
   volatile uint64_t tsx_commits_total = 0;
   volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
 #endif
+#ifdef TSX_ABORT_REASONS
+  volatile uint64_t tsx_abort_reasons_total[TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]
+    = {{0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}};
+#endif
 
   for(t=0; t < num_threads; t++) 
     {
@@ -562,6 +582,11 @@ main(int argc, char **argv)
       tsx_aborts_total[1] += tsx_aborts[1][t];
       tsx_aborts_total[2] += tsx_aborts[2][t];
 #endif
+#ifdef TSX_ABORT_REASONS
+      for (i=0; i<TSX_STATS_DEPTH; i++)
+        for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
+          tsx_abort_reasons_total[i][j] += tsx_abort_reasons[i][j][t];
+#endif
     }
 
 #if defined(COMPUTE_LATENCY)
@@ -585,6 +610,18 @@ main(int argc, char **argv)
          tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);
   fflush(stdout);
 #endif
+#if defined(TSX_ABORT_REASONS)
+  printf("Abort reasons: %-12s %-12s %-12s %-12s %-12s %-12s | %-12s\n",
+         "explicit", "conflict", "capacity", "debug trap", "nested txn", "other", "retry");
+  for (i=0; i<TSX_STATS_DEPTH; i++)
+    printf("Trial %d      : %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu | %-12lu\n",
+           i, tsx_abort_reasons_total[i][0], tsx_abort_reasons_total[i][1],
+           tsx_abort_reasons_total[i][2], tsx_abort_reasons_total[i][3],
+           tsx_abort_reasons_total[i][4], tsx_abort_reasons_total[i][5],
+           tsx_abort_reasons_total[i][6]);
+  fflush(stdout);
+#endif
+
 
 #define LLU long long unsigned int
 
