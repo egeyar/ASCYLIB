@@ -24,9 +24,8 @@
 #include "bst-aravind.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 __thread seek_record_t* seek_record;
 __thread ssmem_allocator_t* alloc;

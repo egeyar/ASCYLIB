@@ -41,14 +41,18 @@ new_search(intset_t *set, skey_t key, node_t **left_node)
 {
   node_t *prev;
   node_t *next;
-  prev = set->head;
-  next = prev->next;
-  while (next->key < key) 
+  do
     {
-      prev = next;
+      prev = set->head;
       next = prev->next;
+      while (next->key < key) 
+        {
+          prev = next;
+          next = prev->next;
+        }
+      *left_node = prev;
     }
-  *left_node = prev;
+  while (unlikely(prev->next != next));
   return next;
 }
 
@@ -79,6 +83,7 @@ new_insert(intset_t *set, skey_t key, sval_t val)
   node_t *newnode = NULL, *prev, *next = NULL;
   do
     {
+retry:
       UPDATE_TRY();
       next = new_search(set, key, &prev);
       if (next->key == key)
@@ -104,6 +109,20 @@ new_insert(intset_t *set, skey_t key, sval_t val)
 	  newnode->next = next;
 	}
 
+      TSX_CRITICAL_SECTION
+        {
+          /* The first condition is to check that they are still adjacent.
+           * The second one is to make sure that 'prev' is not marked deleted. */
+          if (unlikely(prev->next != next))
+            {
+              TSX_ABORT;
+            }
+          prev->next = newnode;
+          TSX_COMMIT;
+          return 1;
+        }
+      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
+
       if (ATOMIC_CAS_MB(&prev->next, next, newnode))
           return 1;
     }
@@ -121,12 +140,28 @@ new_delete(intset_t *set, skey_t key)
   node_t *prev, *next = NULL, *next_next = NULL;
   do
     {
+retry:
       UPDATE_TRY();
       next = new_search(set, key, &prev);
       if (next->key != key)
         {
           return 0;
         }
+      TSX_CRITICAL_SECTION
+        {
+          if (unlikely(prev->next != next || next->key > next->next->key))
+            {
+              TSX_ABORT;
+            }
+          prev->next = next->next;
+          next->next = prev;
+          TSX_COMMIT;
+#if GC == 1
+          ssmem_free(alloc, (void*) next);
+#endif
+          return 1;
+        }
+      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
 
       next_next = next->next;
       if (next->key > next_next->key

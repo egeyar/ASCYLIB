@@ -23,9 +23,8 @@
 
 #include "copy_on_write.h"
 
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 __thread ssmem_allocator_t* alloc;
 

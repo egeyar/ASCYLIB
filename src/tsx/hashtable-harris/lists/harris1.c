@@ -32,9 +32,8 @@
 #include "linkedlist.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 /*
  * The five following functions handle the low-order mark bit that indicates

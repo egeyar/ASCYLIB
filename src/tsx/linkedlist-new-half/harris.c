@@ -40,7 +40,7 @@ node_t*
 new_search(intset_t *set, skey_t key, node_t **left_node) 
 {
   node_t *prev;
-  volatile node_t volatile * volatile next;
+  node_t *next;
   prev = set->head;
   next = prev->next;
   while (next->key < key) 

@@ -24,9 +24,8 @@
 #include "pugh.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 /********************************************************************************* 
  * help search functions

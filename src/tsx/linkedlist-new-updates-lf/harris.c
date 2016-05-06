@@ -41,14 +41,18 @@ new_search(intset_t *set, skey_t key, node_t **left_node)
 {
   node_t *prev;
   node_t *next;
-  prev = set->head;
-  next = prev->next;
-  while (next->key < key) 
+  do
     {
-      prev = next;
+      prev = set->head;
       next = prev->next;
+      while (next->key < key) 
+        {
+          prev = next;
+          next = prev->next;
+        }
+      *left_node = prev;
     }
-  *left_node = prev;
+  while (unlikely(prev->next != next));
   return next;
 }
 

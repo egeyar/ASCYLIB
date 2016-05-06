@@ -25,9 +25,8 @@
 #include "concurrent_hash_map2.h"
 
 RETRY_STATS_VARS;
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 __thread ssmem_allocator_t* alloc = NULL;
 

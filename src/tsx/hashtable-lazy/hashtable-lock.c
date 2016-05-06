@@ -24,9 +24,8 @@
 #include "hashtable-lock.h"
 #include "ssalloc.h"
 
-#ifdef TSX_STATS
 TSX_STATS_VARS;
-#endif
+TSX_ABORT_REASONS_VARS;
 
 unsigned int maxhtlength;
 
