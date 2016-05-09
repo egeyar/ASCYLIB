@@ -54,7 +54,7 @@ set_contains(intset_t *set, skey_t key)
       next = prev->next;
     }
   result = (next->key == key) ? next->val : 0;
-#elif defined LOCKFREE			
+#else			
   result = harris_find(set, key);
 #endif	
 	
@@ -93,7 +93,7 @@ set_add(intset_t *set, skey_t key, skey_t val)
 #endif
 #ifdef SEQUENTIAL /* Unprotected */
   result = set_seq_add(set, key, val);
-#elif defined LOCKFREE
+#else
   result = harris_insert(set, key, val);
 #endif
   return result;
@@ -124,7 +124,7 @@ set_remove(intset_t *set, skey_t key)
       prev->next = next->next;
       free(next);
     }
-#elif defined LOCKFREE
+#else
   result = harris_delete(set, key);
 #endif
 	

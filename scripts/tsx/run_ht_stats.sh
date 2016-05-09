@@ -42,7 +42,7 @@ then
     ctarget=tsx${ds};
     for WORKLOAD in 0 2;
     do
-	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD TSX_STATS=1";
+	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD TSX_STATS=2";
 	echo "----> Compiling" $ctarget " with flags:" $cflags;
 	make $ctarget $cflags >> /dev/null;
 	if [ $? -eq 0 ];

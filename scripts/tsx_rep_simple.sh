@@ -50,9 +50,9 @@ params="$@";
 
 progs_stripped=$(echo $progs | sed -e 's/bin//g' -e 's/[\.\/]//g');
 
-print_n   "#       " "%-95s " "$progs_stripped" "\n"
+print_n   "#       " "%-347s " "$progs_stripped" "\n"
 
-print_rep "#cores  " $progs_num "commit_rate commits     1st_trial   2nd_trial   3rd_trial   1st_abort   2nd_abort   3rd_abort   " "\n"
+print_rep "#cores  " $progs_num "commit_rate commits     1st_trial   2nd_trial   3rd_trial   1st_abort   2nd_abort   3rd_abort   explicit    conflict    capacity    debug_trap  nested      other       retry       explicit    conflict    capacity    debug_trap  nested      other       retry       explicit    conflict    capacity    debug_trap  nested      other       retry       " "\n"
 
 stats="trials_round1 trials_round2 trials_round3 aborts_round1 aborts_round2 aborts_round3 commits";
 

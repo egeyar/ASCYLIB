@@ -1,0 +1,172 @@
+/*   
+ *   File: harris1.c
+ *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
+ *   Description: 
+ *   harris1.c is part of ASCYLIB
+ *
+ * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
+ * 	     	      Tudor David <tudor.david@epfl.ch>
+ *	      	      Distributed Programming Lab (LPD), EPFL
+ *
+ * ASCYLIB is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation, version 2
+ * of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+/*
+ *  linkedlist.c
+ *
+ *  Description:
+ *   Lock-free linkedlist implementation of Harris' algorithm
+ *   "A Pragmatic Implementation of Non-Blocking Linked Lists" 
+ *   T. Harris, p. 300-314, DISC 2001.
+ */
+
+#include "linkedlist.h"
+
+RETRY_STATS_VARS;
+TSX_STATS_VARS;
+TSX_ABORT_REASONS_VARS;
+
+/*
+ * list_search looks for value val, it
+ *  - returns right_node owning val (if present) or its immediately higher 
+ *    value present in the list (otherwise) and 
+ *  - sets the left_node to the node owning the value immediately lower than val. 
+ * Encountered nodes that are marked as logically deleted are physically removed
+ * from the list, yet not garbage collected.
+ */
+static inline node_t* 
+list_search(intset_t* set, skey_t key, node_t** left_node) 
+{
+  node_t *prev;
+  node_t *next;
+  prev = set->head;
+  next = prev->next;
+  while (next->key < key) 
+    {
+      prev = next;
+      next = prev->next;
+    }
+  *left_node = prev;
+  return next;
+}
+
+/*
+ * returns a value different from 0 if there is a node in the list owning value val.
+ */
+sval_t
+harris_find(intset_t* set, skey_t key)
+{
+  node_t *prev, *next;
+  prev = set->head;
+  next = prev->next;
+  while (next->key < key) 
+    {
+      prev = next;
+      next = prev->next;
+    }
+  return (next->key == key) ? next->val : 0;
+}
+
+/*
+ * inserts a new node with the given value val in the list
+ * (if the value was absent) or does nothing (if the value is already present).
+ */
+int
+harris_insert(intset_t *set, skey_t key, sval_t val)
+{
+  node_t *newnode = NULL, *prev, *next = NULL;
+  do
+    {
+      UPDATE_TRY();
+      next = list_search(set, key, &prev);
+      if (next->key == key)
+        {
+#if GC == 1
+	  if (unlikely(newnode != NULL))
+	    {
+	      ssmem_free(alloc, (void*) newnode);
+	    }
+#endif
+          return 0;
+        }
+
+      if (prev->key > next->key)
+          continue;
+
+      if (likely(newnode == NULL))
+	{
+	  newnode = new_node(key, val, next, 0);
+	}
+      else
+	{
+	  newnode->next = next;
+	}
+
+      if (ATOMIC_CAS_MB(&prev->next, next, newnode))
+          return 1;
+    }
+  while(1);
+}
+
+/*
+ * deletes a node with the given value val (if the value is present) 
+ * or does nothing (if the value is already present).
+ * The deletion is logical and consists of setting the node mark bit to 1.
+ */
+sval_t
+harris_delete(intset_t *set, skey_t key)
+{
+  node_t *prev, *next = NULL, *next_next = NULL;
+  do
+    {
+      UPDATE_TRY();
+      next = list_search(set, key, &prev);
+      if (next->key != key)
+        {
+          return 0;
+        }
+
+      next_next = next->next;
+      if (next->key > next_next->key
+          || !ATOMIC_CAS_MB(&next->next, next_next, prev))
+          continue;
+      if (ATOMIC_CAS_MB(&prev->next, next, next_next))
+        {
+#if GC == 1
+          ssmem_free(alloc, (void*) next);
+#endif
+          return 1;
+        }
+      else
+        {
+          next->next = next_next;
+          next_next = NULL;
+        }
+    }
+  while(1);
+}
+
+int
+set_size(intset_t *set)
+{
+  int size = 0;
+  node_t* node;
+
+  /* We have at least 2 elements */
+  node = (node_t*) set->head->next;
+  while ((node_t*) node->next != NULL)
+    {
+      if (node->next) size++;
+      node = (node_t*) node->next;
+    }
+  return size;
+}

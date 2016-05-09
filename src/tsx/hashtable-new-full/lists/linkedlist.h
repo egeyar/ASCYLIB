@@ -45,6 +45,7 @@
 
 #include "common.h"
 #include "utils.h"
+#include "lock_if.h"
 #include "measurements.h"
 #include "ssalloc.h"
 #include "ssmem.h"

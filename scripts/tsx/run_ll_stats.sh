@@ -15,7 +15,8 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/tsx-ll_pugh ${ub}/tsx-ll_tsx );
+#algos=( ${ub}/tsx-ll_harris_cas ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_lazy ${ub}/tsx-ll_pugh ${ub}/tsx-ll_tsx );
+algos=( ${ub}/tsx-ll_harris_tsx ${ub}/tsx-ll_new_half ${ub}/tsx-ll_new_full );
 
 params_i=( 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 64 1024 8192 );
 params_u=( 80 80   80   60 60   60   40 40   40   20 20   20   10 10   10   );
@@ -42,7 +43,7 @@ then
     ctarget=tsx${ds};
     for WORKLOAD in 0 2;
     do
-	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD TSX_STATS=1";
+	cflags="SET_CPU=$set_cpu WORKLOAD=$WORKLOAD TSX_STATS=2";
 	echo "----> Compiling" $ctarget " with flags:" $cflags;
 	make $ctarget $cflags >> /dev/null;
 	if [ $? -eq 0 ];

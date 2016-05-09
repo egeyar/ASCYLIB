@@ -2,7 +2,7 @@ ROOT = ../../..
 
 include $(ROOT)/common/Makefile.common
 
-BINS = $(BINDIR)/tsx-ht_new
+BINS = $(BINDIR)/tsx-ht_new_full
 LLREP = lists
 PROF = $(ROOT)/src
 
