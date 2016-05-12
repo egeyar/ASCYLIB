@@ -344,12 +344,14 @@ ifeq ($(TSX_NESTED_TXN),1)
 	CFLAGS += -DTSX_NESTED_TXN
 endif
 
-ifeq ($(TSX_PREFETCH),1)
-	CFLAGS += -DTSX_PREFETCH
+ifeq ($(TSX_SMART),1)
+	CFLAGS += -DTSX_SMART
 endif
 
-ifeq ($(TSX_PREFETCH),2)
-	CFLAGS += -DTSX_PREFETCH_TXN
+ifeq ($(TSX_PREFETCH),1)
+	CFLAGS += -DTSX_PREFETCH=1
+else ifeq ($(TSX_PREFETCH),2)
+	CFLAGS += -DTSX_PREFETCH=2
 endif
 
 ifeq ($(POWER),1)

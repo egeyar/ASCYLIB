@@ -14,7 +14,7 @@ set lmargin 3
 set tmargin 3
 set bmargin 2.5
 
-n_algo = 4
+n_algo = 3
 
 title_offset   = -0.5
 top_row_y      = 1.76
@@ -29,15 +29,19 @@ plot_size_y    = 2.44
 
 MULTIPLIER       =    100
 FIRST            =    1
-OFFSET           =    8
+OFFSET           =    8+21
 column_select(i, j) = column(FIRST + ((i-1)*OFFSET) + j)
 commit_rate(i) = column_select(i, 1) * (MULTIPLIER)
 direct_commit_rate(i) = (1 - (column_select(i, 6)/column_select(i, 3))) * (MULTIPLIER)
 
-LINE0 = '"tsx-harris-cas"'
-LINE1 = '"tsx-harris"'
-LINE2 = '"tsx-lazy"'
-LINE3 = '"tsx-pugh"'
+#LINE0 = '"tsx-harris-cas"'
+#LINE1 = '"tsx-harris"'
+#LINE2 = '"tsx-lazy"'
+#LINE3 = '"tsx-pugh"'
+
+LINE0 = '"harris-tsx"'
+LINE1 = '"new-half"'
+LINE2 = '"new-full"'
 
 PLOT0 = '"Low Contention\n{/*0.8(8192 elements)}"'
 PLOT1 = '"Medium contention\n{/*0.8(1024 elements)}"'
@@ -63,7 +67,7 @@ FILE2 = '"data/data.stats.ll.i64.u10.w0.dat"'
 unset xlabel
 unset key
 set xtics 20
-set ytics 20
+#set ytics 20
 
 set size plot_size_x, plot_size_y
 set multiplot layout 5, 2
@@ -285,8 +289,7 @@ set yrange [-1:1]
 plot \
      NaN title @LINE0 ls 1 with linespoints, \
      NaN title @LINE1 ls 2 with linespoints, \
-     NaN title @LINE2 ls 3 with linespoints, \
-     NaN title @LINE3 ls 4 with linespoints
+     NaN title @LINE2 ls 3 with linespoints
 
 #</null>
 unset multiplot  #<--- Necessary for some terminals, but not postscript I don't thin

@@ -279,7 +279,7 @@ typedef volatile UTYPE ptlock_t;
 
 
 #  define TSX_STATS_DEPTH 3
-#  ifdef TSX_STATS
+#  if defined(TSX_STATS) || defined(TSX_SMART)
 #    define TSX_STATS_VARS \
 __thread ticks my_tsx_trials[3] = {0, 0, 0},   \
                my_tsx_commits = 0,             \
@@ -298,6 +298,15 @@ EXTERN_TSX_STATS_VARS;
 #    define TSX_STATS_ABORTS(i) 
 #    define TSX_STATS_TRIALS(i)
 #    define TSX_STATS_COMMITS()
+#  endif
+
+
+#  ifdef TSX_SMART
+#    define TSX_CONFLICT_TOO_HIGH                                      \
+       ((my_tsx_commits<<1 < my_tsx_trials[0])                         \
+         && (my_tsx_trials[0] > 1000))
+#  else
+#    define TSX_CONFLICT_TOO_HIGH (0)
 #  endif
 
 
@@ -357,17 +366,17 @@ static __thread uint64_t tsx_depth = 0;
 #  endif
 
 
-#  ifdef TSX_PREFETCH_TXN
+#  if TSX_PREFETCH==2
 #    define TSX_PREFETCH_BEGIN()
 #    define TSX_PREFETCH_FETCH_R(x)
 #    define TSX_PREFETCH_FETCH_W(x)   ATOMIC_CAS_MB(x, 0, 1)
 #    define TSX_PREFETCH_END()
-#  elif defined TSX_PREFETCH
+#  elif TSX_PREFETCH==1
 #    define TSX_PREFETCH_BEGIN()
 #    define TSX_PREFETCH_FETCH_R(x)   asm volatile("prefetch %0" :: "m" (*(unsigned long *)x))
 #    define TSX_PREFETCH_FETCH_W(x)   asm volatile("prefetchw %0" :: "m" (*(unsigned long *)x))
 #    define TSX_PREFETCH_END()
-#  else
+#  else /*TSX_PREFETCH==0*/
 #    define TSX_PREFETCH_BEGIN()
 #    define TSX_PREFETCH_FETCH_R(x)
 #    define TSX_PREFETCH_FETCH_W(x)
@@ -376,43 +385,47 @@ static __thread uint64_t tsx_depth = 0;
 
 
 #  define TSX_CRITICAL_SECTION                 \
-long status;                                   \
-int t;                                         \
-for (t = 0; t < TSX_TRIES; t++)                \
+if (unlikely(!TSX_CONFLICT_TOO_HIGH))          \
 {                                              \
-  TSX_DEPTH_INC();                             \
-  if (!TSX_USE_CURRENT_TXN())                  \
+  long status;                                 \
+  int t;                                       \
+  for (t = 0; t < TSX_TRIES; t++)              \
   {                                            \
-    TSX_STATS_TRIALS(t);                       \
-  }                                            \
-  if (TSX_USE_CURRENT_TXN() ||                 \
+    TSX_DEPTH_INC();                           \
+    if (!TSX_USE_CURRENT_TXN())                \
+    {                                          \
+      TSX_STATS_TRIALS(t);                     \
+    }                                          \
+    if (TSX_USE_CURRENT_TXN() ||               \
       (status = _xbegin()) == _XBEGIN_STARTED)
 
 #  define TSX_AFTER                            \
-  else                                         \
-  {                                            \
-    TSX_DEPTH_DEC();                           \
-    TSX_STATS_ABORTS(t);                       \
-    TSX_ABORT_REASON(t, status);               \
-    if (status & _XABORT_EXPLICIT)             \
-      break;                                   \
-    if (!(status & _XABORT_RETRY))             \
-      break;                                   \
-    pause_rep((1<<((1+t)*5)) & 255);           \
+    else                                       \
+    {                                          \
+      TSX_DEPTH_DEC();                         \
+      TSX_STATS_ABORTS(t);                     \
+      TSX_ABORT_REASON(t, status);             \
+      if (status & _XABORT_EXPLICIT)           \
+        break;                                 \
+      if (!(status & _XABORT_RETRY))           \
+        break;                                 \
+      pause_rep((1<<((1+t)*5)) & 255);         \
+    }                                          \
   }                                            \
 }
 
 #  define TSX_END_EXPLICIT_ABORTS_GOTO(x)      \
-  else                                         \
-  {                                            \
-    TSX_DEPTH_DEC();                           \
-    TSX_STATS_ABORTS(t);                       \
-    TSX_ABORT_REASON(t, status);               \
-    if (status & _XABORT_EXPLICIT)             \
-      goto x;                                  \
-    if (!(status & _XABORT_RETRY))             \
-      break;                                   \
-    pause_rep((1<<((1+t)*5)) & 255);           \
+    else                                       \
+    {                                          \
+      TSX_DEPTH_DEC();                         \
+      TSX_STATS_ABORTS(t);                     \
+      TSX_ABORT_REASON(t, status);             \
+      if (status & _XABORT_EXPLICIT)           \
+        goto x;                                \
+      if (!(status & _XABORT_RETRY))           \
+        break;                                 \
+      pause_rep((1<<((1+t)*5)) & 255);         \
+    }                                          \
   }                                            \
 }
 

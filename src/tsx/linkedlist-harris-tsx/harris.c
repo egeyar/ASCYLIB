@@ -225,6 +225,7 @@ harris_delete(intset_t *set, skey_t key)
 	
   do 
     {
+retry:
       UPDATE_TRY();
       right_node = harris_search(set, key, &left_node);
       if (right_node->key != key)
@@ -257,7 +258,7 @@ harris_delete(intset_t *set, skey_t key)
 #endif
               return ret;
             }
-          TSX_AFTER
+          TSX_END_EXPLICIT_ABORTS_GOTO(retry);
 
           /*The fallback path*/
 	  if (ATOMIC_CAS_MB(&right_node->next, right_node_next, get_marked_ref((long) right_node_next)))

@@ -32,14 +32,23 @@ FIRST            =    2
 OFFSET           =    1
 column_select(i) = column(FIRST + ((i-1)*OFFSET)) / (DIV);
 
-LINE0 = '"tsx-harris-cas"'
-LINE1 = '"tsx-harris"'
-LINE2 = '"tsx"'
-LINE3 = '"harris"'
-LINE4 = '"tsx-lazy"'
-LINE5 = '"lazy"'
-LINE6 = '"tsx-pugh"'
-LINE7 = '"pugh"'
+#LINE0 = '"tsx-harris-cas"'
+#LINE1 = '"tsx-harris"'
+#LINE2 = '"tsx"'
+#LINE3 = '"harris"'
+#LINE4 = '"tsx-lazy"'
+#LINE5 = '"lazy"'
+#LINE6 = '"tsx-pugh"'
+#LINE7 = '"pugh"'
+
+LINE0 = '"harris"'
+LINE1 = '"new-lf"'
+LINE2 = '"new-half"'
+LINE3 = '"new-full"'
+LINE4 = '"new-half-100"'
+LINE5 = '"new-full-100"'
+LINE6 = '"new-half-1000"'
+LINE7 = '"new-full-1000"'
 
 PLOT0 = '"Low Contention\n{(8192 elements)}"'
 PLOT1 = '"Medium contention\n{(1024 elements)}"'
@@ -289,7 +298,8 @@ plot \
      NaN title @LINE3 ls 4 with linespoints, \
      NaN title @LINE4 ls 5 with linespoints, \
      NaN title @LINE5 ls 6 with linespoints, \
-     NaN title @LINE6 ls 7 with linespoints
+     NaN title @LINE6 ls 7 with linespoints, \
+     NaN title @LINE7 ls 8 with linespoints
 
 #</null>
 unset multiplot  #<--- Necessary for some terminals, but not postscript I don't thin

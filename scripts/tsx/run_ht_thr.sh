@@ -15,11 +15,18 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/lb-ht_lazy ${ub}/tsx-ht_lazy ${ub}/lf-ht_harris ${ub}/tsx-ht_harris ${ub}/lb-ht_java ${ub}/tsx-ht_java ${ub}/lb-ht_copy ${ub}/tsx-ht_copy ${ub}/lb-ht_clht ${ub}/tsx-ht_clht );
+#algos=( ${ub}/lb-ht_lazy ${ub}/tsx-ht_lazy ${ub}/lf-ht_harris ${ub}/tsx-ht_harris ${ub}/lb-ht_java ${ub}/tsx-ht_java ${ub}/lb-ht_copy ${ub}/tsx-ht_copy ${ub}/lb-ht_clht ${ub}/tsx-ht_clht );
+algos=( ${ub}/lf-ht_harris ${ub}/lf-ht_new ${ub}/tsx-ht_new_half ${ub}/tsx-ht_new_full );
 
-params_i=( 512 8192 65536 512 8192 65536 512 8192 65536 512 8192 65536 512 8192 65536 );
-params_u=( 80  80   80    60  60   60    40  40   40    20  20   20    10  10   10    );
-params_w=( 0   0    0     0   0    0     0   0    0     0   0    0     0   0    0     );
+#params_i=( 512 8192 65536 512 8192 65536 512 8192 65536 512 8192 65536 512 8192 65536 );
+#params_u=( 80  80   80    60  60   60    40  40   40    20  20   20    10  10   10    );
+#params_w=( 0   0    0     0   0    0     0   0    0     0   0    0     0   0    0     );
+
+params_i=( 512 8192 65536 );
+params_u=( 80  80   80    );
+params_w=( 0   0    0     );
+
+
 load_factor=1;
 np=${#params_i[*]};
 
