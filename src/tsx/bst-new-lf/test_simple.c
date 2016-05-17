@@ -53,14 +53,14 @@
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,t)  set_contains(s, k)
-#define DS_ADD(s,k,t)       set_add(s, k, k)
-#define DS_REMOVE(s,k,t)    set_remove(s, k)
-#define DS_SIZE(s)          set_size(s)
-#define DS_NEW()            set_new()
+#define DS_CONTAINS(s,k,t)    set_contains(s, k)
+#define DS_ADD(s,k,t)         set_add(s, k, k)
+#define DS_REMOVE(s,k,t)      set_remove(s, k)
+#define DS_SIZE(s)            set_size(s)
+#define DS_NEW()              set_new()
 
-#define DS_TYPE             intset_t
-#define DS_NODE             node_t
+#define DS_TYPE               intset_t
+#define DS_NODE               node_t
 
 /* ################################################################### *
  * GLOBALS
@@ -74,6 +74,7 @@ size_t load_factor;
 size_t update = DEFAULT_UPDATE;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
+int test_verbose = 0;
 
 size_t print_vals_num = 100; 
 size_t pf_vals_num = 1023;
@@ -150,7 +151,6 @@ test(void* thread)
   volatile ticks my_removing_succ = 0;
   volatile ticks my_removing_fail = 0;
 #endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;
@@ -209,6 +209,7 @@ test(void* thread)
       printf("#BEFORE size is: %zu\n", (size_t) DS_SIZE(set));
     }
 
+
   RETRY_STATS_ZERO();
 
   barrier_cross(&barrier_global);
@@ -266,7 +267,6 @@ test(void* thread)
   EXEC_IN_DEC_ID_ORDER(ID, num_threads)
     {
       print_latency_stats(ID, SSPFD_NUM_ENTRIES, print_vals_num);
-      /* retry stats */
       RETRY_STATS_SHARE();
     }
   EXEC_IN_DEC_ID_ORDER_END(&barrier);
@@ -290,6 +290,7 @@ main(int argc, char **argv)
   struct option long_options[] = {
     // These options don't set a flag
     {"help",                      no_argument,       NULL, 'h'},
+    {"verbose",                   no_argument,       NULL, 'e'},
     {"duration",                  required_argument, NULL, 'd'},
     {"initial-size",              required_argument, NULL, 'i'},
     {"num-threads",               required_argument, NULL, 'n'},
@@ -305,7 +306,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:el:p:b:v:f:x:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -328,6 +329,8 @@ main(int argc, char **argv)
 		 "Options:\n"
 		 "  -h, --help\n"
 		 "        Print this message\n"
+		 "  -e, --verbose\n"
+		 "        Be verbose\n"
 		 "  -d, --duration <int>\n"
 		 "        Test duration in milliseconds\n"
 		 "  -i, --initial-size <int>\n"
@@ -346,10 +349,18 @@ main(int argc, char **argv)
 		 "        When using detailed profiling, how many values to print.\n"
 		 "  -f, --val-pf <int>\n"
 		 "        When using detailed profiling, how many values to keep track of.\n"
+		 "  -x, --lock-based algorithm (default=1)\n"
+		 "        Use lock-based algorithm\n"
+		 "        1 = lock-coupling,\n"
+		 "        2 = lazy algorithm\n"
+		 "        3 = Pugh's lazy algorithm\n"
 		 , argv[0]);
 	  exit(0);
 	case 'd':
 	  duration = atoi(optarg);
+	  break;
+	case 'e':
+	  test_verbose = 1;
 	  break;
 	case 'i':
 	  initial = atoi(optarg);
@@ -396,7 +407,9 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Initial: %zu / Range: %zu\n", initial, range);
+  printf("## Initial: %zu / Range: %zu / ", initial, range);
+  printf("Sequential \n");
+
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
   double mb = kb / 1024.0;
@@ -502,14 +515,15 @@ main(int argc, char **argv)
 	}
         
     }
-      /* Free attribute and wait for the other threads */
+    
+  /* Free attribute and wait for the other threads */
   pthread_attr_destroy(&attr);
     
   barrier_cross(&barrier_global);
   gettimeofday(&start, NULL);
   nanosleep(&timeout, NULL);
-
   stop = 1;
+
   gettimeofday(&end, NULL);
   duration = (end.tv_sec * 1000 + end.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000);
     
@@ -549,6 +563,12 @@ main(int argc, char **argv)
    
   for(t=0; t < num_threads; t++) 
     {
+      if (test_verbose)
+	{
+	  printf("Thrd: %3lu : srch: %10zu (%10zu) / insr: %10zu (%10zu) / rems: %10zu (%10zu)\n",
+		 t, getting_count[t], getting_count_succ[t], putting_count[t], putting_count_succ[t],
+		 removing_count[t], removing_count_succ[t]);
+	}
       PRINT_OPS_PER_THREAD();
       putting_suc_total += putting_succ[t];
       putting_fal_total += putting_fail[t];

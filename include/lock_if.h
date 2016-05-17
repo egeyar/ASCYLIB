@@ -304,7 +304,7 @@ EXTERN_TSX_STATS_VARS;
 #  ifdef TSX_SMART
 #    define TSX_CONFLICT_TOO_HIGH                                      \
        ((my_tsx_commits<<1 < my_tsx_trials[0])                         \
-         && (my_tsx_trials[0] > 1000))
+         && (my_tsx_trials[0] > 100))
 #  else
 #    define TSX_CONFLICT_TOO_HIGH (0)
 #  endif

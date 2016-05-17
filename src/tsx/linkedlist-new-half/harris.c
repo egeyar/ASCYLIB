@@ -92,8 +92,8 @@ new_insert(intset_t *set, skey_t key, sval_t val)
           return 0;
         }
 
-      if (prev->key > next->key)
-          continue;
+//      if (prev->key > next->key)
+//          continue;
 
       if (likely(newnode == NULL))
 	{
@@ -158,7 +158,6 @@ retry:
       else
         {
           next->next = next_next;
-          next_next = NULL;
         }
     }
   while(1);
