@@ -322,7 +322,7 @@ EXTERN_TSX_STATS_VARS;
             extern __thread ticks my_tsx_abort_reasons                 \
                      [TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]
 #    define TSX_ABORT_REASON(trial_no, status)                         \
-       if (! (status & (_XABORT_EXPLICIT  | _XABORT_CONFLICT           \
+       if (! (status & (_XABORT_EXPLICIT  | _XABORT_CAPACITY           \
                         | _XABORT_CONFLICT | _XABORT_DEBUG             \
                         | _XABORT_NESTED)))                            \
          my_tsx_abort_reasons[trial_no][5]++;                          \

@@ -3,7 +3,7 @@
 BENCHS = src/bst-aravind src/bst-bronson src/bst-drachsler src/bst-ellen src/bst-howley src/bst-seq_internal src/bst-tk src/tsx/bst-tk src/tsx/bst-aravind-cas src/tsx/bst-aravind-tsx src/hashtable-copy src/hashtable-coupling src/hashtable-harris src/hashtable-java src/hashtable-java_optik src/hashtable-lazy src/hashtable-optik0 src/hashtable-optik1 src/hashtable-map_optik src/hashtable-pugh src/hashtable-rcu src/hashtable-seq src/hashtable-tbb src/tsx/hashtable-lazy src/linkedlist-copy src/linkedlist-coupling src/linkedlist-gl_opt src/linkedlist-harris src/linkedlist-harris_opt src/linkedlist-lazy src/linkedlist-lazy_sp src/linkedlist-lazy_orig src/linkedlist-lazy_cache src/linkedlist-optik src/linkedlist-optik_gl src/linkedlist-optik_cache src/linkedlist-michael src/linkedlist-pugh src/linkedlist-seq src/tsx/linkedlist-lazy src/tsx/linkedlist-harris-tsx src/tsx/linkedlist-harris-cas src/noise src/skiplist-fraser src/skiplist-herlihy_lb src/skiplist-optik src/skiplist-optik1 src/skiplist-optik2 src/skiplist-herlihy_lf src/skiplist-pugh src/skiplist-seq src/priorityqueue-alistarh src/priorityqueue-lotanshavit_lf src/priorityqueue-alistarh-herlihyBased src/priorityqueue-alistarh-pughBased src/queue-ms_lb src/queue-ms_hybrid src/queue-ms_lf src/queue-optik0 src/queue-optik1 src/queue-optik2 src/queue-optik2a src/queue-optik3 src/queue-optik4 src/queue-optik5 src/stack-treiber src/stack-lock src/stack-optik src/stack-optik1 src/stack-optik2 src/map-lock src/map-optik
 LBENCHS = src/linkedlist-coupling src/linkedlist-gl_opt src/linkedlist-lazy src/linkedlist-lazy_sp src/linkedlist-lazy_orig src/linkedlist-lazy_cache src/linkedlist-optik src/linkedlist-optik_gl src/linkedlist-optik_cache src/linkedlist-pugh src/linkedlist-copy src/hashtable-pugh src/hashtable-coupling src/hashtable-lazy src/hashtable-optik0 src/hashtable-optik1 src/hashtable-map_optik src/hashtable-java src/hashtable-java_optik src/hashtable-copy src/skiplist-herlihy_lb src/skiplist-optik src/skiplist-optik1 src/skiplist-optik2 src/skiplist-pugh src/bst-bronson src/bst-drachsler src/bst-tk src/priorityqueue-alistarh-pughBased src/queue-ms_lb src/queue-ms_hybrid src/queue-optik0 src/queue-optik1 src/queue-optik2 src/queue-optik2a src/queue-optik3 src/queue-optik4 src/queue-optik5 src/stack-lock src/stack-optik src/stack-optik1 src/stack-optik2 src/map-lock src/map-optik
 LFBENCHS = src/linkedlist-harris src/linkedlist-harris_opt src/linkedlist-michael src/hashtable-harris src/skiplist-fraser src/skiplist-herlihy_lf src/bst-ellen src/bst-howley src/bst-aravind src/priorityqueue-alistarh src/priorityqueue-lotanshavit_lf src/priorityqueue-alistarh-herlihyBased src/queue-ms_lf src/stack-treiber
-TSXBENCHS = src/tsx/linkedlist-lazy src/tsx/linkedlist-harris-tsx src/tsx/linkedlist-harris-cas src/tsx/skiplist-herlihy_lb src/tsx/skiplist-fraser-cas src/tsx/bst-tk src/tsx/hashtable-lazy src/tsx/skiplist-fraser-tsx src/tsx/bst-aravind-cas src/tsx/bst-aravind-tsx src/tsx/hashtable-harris src/tsx/skiplist-pugh src/tsx/linkedlist-pugh src/tsx/hashtable-java src/tsx/hashtable-copy src/tsx/linkedlist-new-lf src/tsx/linkedlist-new-half src/tsx/linkedlist-new-full src/tsx/linkedlist-new-updates-lf src/tsx/linkedlist-new-updates-half src/tsx/linkedlist-new-updates-full src/tsx/hashtable-new-full src/tsx/hashtable-new-half src/tsx/hashtable-new-lf src/tsx/bst-new src/tsx/bst-new-lf
+TSXBENCHS = src/tsx/linkedlist-lazy src/tsx/linkedlist-harris-tsx src/tsx/linkedlist-harris-cas src/tsx/skiplist-herlihy_lb src/tsx/skiplist-fraser-cas src/tsx/bst-tk src/tsx/hashtable-lazy src/tsx/skiplist-fraser-tsx src/tsx/bst-aravind-cas src/tsx/bst-aravind-tsx src/tsx/hashtable-harris src/tsx/skiplist-pugh src/tsx/linkedlist-pugh src/tsx/hashtable-java src/tsx/hashtable-copy src/tsx/linkedlist-new-lf src/tsx/linkedlist-new-half src/tsx/linkedlist-new-full src/tsx/linkedlist-new-updates-lf src/tsx/linkedlist-new-updates-half src/tsx/linkedlist-new-updates-full src/tsx/hashtable-new-full src/tsx/hashtable-new-half src/tsx/hashtable-new-lf src/tsx/bst-new src/tsx/bst-new-lf src/tsx/skiplist-new
 SEQBENCHS = src/linkedlist-seq src/hashtable-seq src/skiplist-seq src/bst-seq_internal src/bst-seq_external
 EXTERNALS = src/hashtable-rcu src/hashtable-tbb
 NOISE = src/noise
@@ -163,8 +163,11 @@ tsxsl_fraser_cas:
 tsxsl_fraser_tsx:
 	$(MAKE) "LOCK=TSX" src/tsx/skiplist-fraser-tsx
 
+tsxsl_new:
+	$(MAKE) "LOCK=TSX" src/tsx/skiplist-new
+
 sl:	seqsl lfsl_fraser lfsl_herlihy_lf lbsl_pugh lbsl_herlihy_lb lbsl_optik lbsl_optik1 lbsl_optik2
-tsxsl:	tsxsl_herlihy_lb tsxsl_fraser_tsx lbsl_herlihy_lb lfsl_fraser lbsl_pugh tsxsl_pugh
+tsxsl:	tsxsl_herlihy_lb tsxsl_fraser_tsx lbsl_herlihy_lb lfsl_fraser lbsl_pugh tsxsl_pugh tsxsl_new
 slppopp: lfsl_fraser lbsl_herlihy_lb lbsl_optik lbsl_optik1 lbsl_optik2
 
 qu: lbqu_ms lfqu_ms lbqu_optik0 lbqu_optik1 lbqu_optik2 lbqu_optik2a lbqu_optik3 lbqu_optik4 lbqu_optik5
@@ -543,6 +546,7 @@ clean:
 	$(MAKE) -C src/tsx/skiplist-fraser-cas clean
 	$(MAKE) -C src/tsx/skiplist-fraser-tsx clean
 	$(MAKE) -C src/tsx/skiplist-pugh clean
+	$(MAKE) -C src/tsx/skiplist-new clean
 	$(MAKE) -C src/tsx/bst-tk clean
 	$(MAKE) -C src/tsx/bst-aravind-cas clean
 	$(MAKE) -C src/tsx/bst-aravind-tsx clean

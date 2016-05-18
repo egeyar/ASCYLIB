@@ -46,122 +46,6 @@
 static volatile int stop;
 extern __thread ssmem_allocator_t* alloc;
 
-
-typedef union tl32
-{
-  struct
-  {
-    volatile uint16_t version;
-    volatile uint16_t ticket;
-  };
-  volatile uint32_t to_uint32;
-} tl32_t;
-
-
-typedef union tl
-{
-  tl32_t lr[2];
-  uint64_t to_uint64;
-} tl_t;
-
-static inline int
-tl_trylock_version(volatile tl_t* tl, volatile tl_t* tl_old, int right)
-{
-  TSX_PREFETCH_BEGIN();
-  TSX_PREFETCH_FETCH_R(tl_old);
-  TSX_PREFETCH_FETCH_W(tl);
-  TSX_PREFETCH_END();
-
-  TSX_CRITICAL_SECTION
-    {
-      if (likely(tl_old->lr[right].ticket == tl_old->lr[right].version
-              && tl->lr[right].to_uint32 == tl_old->lr[right].to_uint32))
-      {
-        tl->lr[right].ticket++;
-        TSX_COMMIT;
-        return 1;
-      }
-      else
-      {
-        TSX_ABORT;
-      }
-    }
-  TSX_AFTER;
-
-  uint16_t version = tl_old->lr[right].version;
-
-#if __GNUC__ >= 5 //stackoverflow.com/questions/13746033
-  tl32_t tlo = {{ .version = version, .ticket = version }};
-  tl32_t tln = {{ .version = version, .ticket = (version + 1) }};
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
-#elif __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
-  tl32_t tlo = { .version = version, .ticket = version };
-  tl32_t tln = { .version = version, .ticket = (version + 1) };
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
-#else
-  tl32_t tlo = { version, version };
-  tl32_t tln = { version, (version + 1) };
-#endif
-  return CAS_U32(&tl->lr[right].to_uint32, tlo.to_uint32, tln.to_uint32) == tlo.to_uint32;
-}
-
-#define TLN_REMOVED  0x0000FFFF0000FFFF0000LL
-
-static inline int
-tl_trylock_version_both(volatile tl_t* tl, volatile tl_t* tl_old)
-{
-/*
-  TSX_CRITICAL_SECTION
-    {
-      if (likely(tl_old->lr[0].version == tl_old->lr[0].ticket 
-              && tl_old->lr[1].version == tl_old->lr[1].ticket
-              && tl->to_uint64 == tl_old->to_uint64))
-      {
-        tl->to_uint64 = TLN_REMOVED;
-        TSX_COMMIT;
-        return 1;
-      }
-      else
-      {
-        TSX_ABORT;
-      }
-    }
-  TSX_AFTER;
-*/
-  uint16_t v0 = tl_old->lr[0].version;
-  uint16_t v1 = tl_old->lr[1].version;
-  if (unlikely(v0 != tl_old->lr[0].ticket || v1 != tl_old->lr[1].ticket))
-    return 0;
-#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
-  tl_t tlo = { .to_uint64 = tl_old->to_uint64 };
-  return CAS_U64(&tl->to_uint64, tlo.to_uint64, TLN_REMOVED) == tlo.to_uint64;
-#else
-  /* tl_t tlo; */
-  /* tlo.uint64_t = tl_old->to_uint64; */
-  uint64_t tlo = *(uint64_t*) tl_old;
-
-  return CAS_U64((uint64_t*) tl, tlo, TLN_REMOVED) == tlo;
-#endif
-}
-
-static inline void
-tl_unlock(volatile tl_t* tl, int right)
-{
-  /* PREFETCHW(tl); */
-#ifdef __tile__
-  MEM_BARRIER;
-#endif
-  COMPILER_NO_REORDER(tl->lr[right].version++);
-}
-
-static inline void
-tl_revert(volatile tl_t* tl, int right)
-{
-  /* PREFETCHW(tl); */
-  COMPILER_NO_REORDER(tl->lr[right].ticket--);
-}
-
-
 typedef struct node
 {
   skey_t key;
@@ -172,9 +56,7 @@ typedef struct node
   };
   volatile struct node* left;
   volatile struct node* right;
-  volatile tl_t lock;
-
-  uint8_t padding[CACHE_LINE_SIZE - 40];
+  uint8_t padding[CACHE_LINE_SIZE - 32];
 } node_t;
 
 typedef ALIGNED(CACHE_LINE_SIZE) struct intset
