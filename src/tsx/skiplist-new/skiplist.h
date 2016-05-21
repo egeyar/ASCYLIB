@@ -40,6 +40,7 @@
 
 #include "common.h"
 #include "utils.h"
+#include "lock_if.h"
 #include "ssalloc.h"
 #include "ssmem.h"
 
@@ -58,8 +59,8 @@ typedef volatile struct sl_node
 {
   skey_t key;
   sval_t val;
-  uint32_t deleted;
-  uint32_t toplevel;
+  uint32_t  deleted;
+  volatile uint32_t toplevel;
   volatile struct sl_node* next[1];
 } sl_node_t;
 
