@@ -48,7 +48,7 @@ sl_contains(sl_intset_t *set, skey_t key)
   node = node->next[0];
   result = (node->key == key);
 		
-#elif defined LOCKFREE /* fraser lock-free */
+#else /* fraser lock-free */
   result = fraser_find(set, key);
 #endif
 	
@@ -94,7 +94,7 @@ sl_add(sl_intset_t *set, skey_t key, sval_t val)
   int result = 0;
 #ifdef SEQUENTIAL
   result = sl_seq_add(set, key, val);
-#elif defined LOCKFREE /* fraser lock-free */
+#else /* fraser lock-free */
   result = fraser_insert(set, key, val);
 #endif
   return result;
@@ -130,7 +130,7 @@ sl_remove(sl_intset_t *set, skey_t key)
       sl_delete_node(next); 
     }
 
-#elif defined LOCKFREE
+#else
   result = fraser_remove(set, key);
 #endif
 	

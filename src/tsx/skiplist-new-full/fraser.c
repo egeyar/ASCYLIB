@@ -103,14 +103,12 @@ fraser_find(sl_intset_t *set, skey_t key)
 sval_t
 fraser_remove(sl_intset_t *set, skey_t key)
 {
-  return 0;
   sl_node_t *curr, *curr_next;
   sl_node_t* preds[FRASER_MAX_MAX_LEVEL];
   sl_node_t* succs[FRASER_MAX_MAX_LEVEL];
   int i;
   sval_t result = 0;
 
-retry:
   UPDATE_TRY();
 
   PARSE_START_TS(2);
@@ -118,45 +116,36 @@ retry:
   PARSE_END_TS(2, lat_parsing_rem++);
 
   /* If k-node does not exist or marked deleted, the operation fails */
-  if (succs[0]->key != key)
-    {
-      return 0;
-    }
-
   curr = succs[0];
-  if (curr->key > curr->next[0]->key)
+  if (unlikely(curr->key != key || curr->deleted))
     {
       return 0;
     }
 
-  curr_next = curr->next[0];
-  if (!ATOMIC_CAS_MB(&curr->next[0], curr_next, preds[0]))
+  if (unlikely(ATOMIC_FETCH_AND_INC_FULL(&succs[0]->deleted) != 0))
     {
-      goto retry;
+      return 0;
     }
-  
-  while (1)
-    {
-      if (ATOMIC_CAS_MB(&preds[0]->next[0], curr, curr_next))
-        break;
-      fraser_search(set, key, preds, succs, 0);
-    } 
 
-  for (i = 1; i < curr->toplevel; i++) 
+  for (i = curr->toplevel-1; i >= 0; i--) 
     {
-      while (1)
+      while(1)
 	{
-	  /* Update the forward pointer if it is stale */
 	  curr_next = curr->next[i];
-	  if (ATOMIC_CAS_MB(&curr->next[i], curr_next, preds[i])
-              && ATOMIC_CAS_MB(&preds[i]->next[i], curr, curr_next))
-	    break;
-          if (i > curr->toplevel)
-            break;
+	  if (ATOMIC_CAS_MB(&curr->next[i], curr_next, preds[i]))
+            {
+              if (ATOMIC_CAS_MB(&preds[i]->next[i], curr, curr_next) || i >= curr->toplevel)
+                {
+                  break;
+                }
+              else
+                {
+                  curr->next[i] = curr_next;
+                }
+            }
 	  fraser_search(set, key, preds, succs, i);
 	}
     }
-
     result = curr->val;
 #if GC == 1
       ssmem_free(alloc, (void*) curr);
@@ -168,9 +157,7 @@ retry:
 int
 fraser_insert(sl_intset_t *set, skey_t key, sval_t val) 
 {
-  return 0;
   sl_node_t *new = NULL, *new_next;
-  /* sl_new_node **succs, **preds; */
   sl_node_t *succs[FRASER_MAX_MAX_LEVEL], *preds[FRASER_MAX_MAX_LEVEL];
   int i;
   int result = 0;
@@ -185,14 +172,20 @@ retry:
   if (succs[0]->key == key) 
     {				/* Value already in list */
       result = 0;
-      if (new != NULL)
+#if GC == 1
+      if (unlikely(new != NULL))
         {
           sl_delete_node(new);
         }
+#endif
       goto end;
     }
 
-  new = sl_new_simple_node(key, val, get_rand_level(), 0);
+  if (new == NULL)
+    {
+      new = sl_new_simple_node(key, val, get_rand_level(), 0);
+    }
+
   for (i = 0; i < new->toplevel; i++)
     {
       new->next[i] = succs[i];
@@ -214,16 +207,13 @@ retry:
 	{
 	  /* Update the forward pointer if it is stale */
 	  new_next = new->next[i];
-	  if (new->key > new->next[0]->key) /* If new is deleted*/
+	  if (new->deleted) /* If new is deleted*/
 	    {
               new->toplevel = i;
 	      goto success;
 	    }
-	  if ((new_next != succs[i]) && 
-	      (!ATOMIC_CAS_MB(&new->next[i], new_next, succs[i])))
-	    break; 
-	  /* We retry the search if the CAS fails */
-	  if (ATOMIC_CAS_MB(&preds[i]->next[i], succs[i], new))
+	  if (((new_next == succs[i]) || ATOMIC_CAS_MB(&new->next[i], new_next, succs[i]))
+              && ATOMIC_CAS_MB(&preds[i]->next[i], succs[i], new))
 	    break;
 
 	  fraser_search(set, key, preds, succs, i);
