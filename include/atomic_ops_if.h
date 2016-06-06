@@ -272,6 +272,7 @@ uint8_t oldval;
 /* start --generic code */
 
 #define CAS_U64_bool(addr, old, new) (old == CAS_U64(addr, old, new))
+#define CAS_U32_bool(addr, old, new) (old == CAS_U32(addr, old, new))
 
 /* static inline uint8_t */
 /* CAS_U64_bool(volatile AO_t* addr, AO_t old, AO_t new) */

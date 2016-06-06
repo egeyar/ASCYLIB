@@ -1,10 +1,12 @@
 /*   
- *   File: harris.h
+ *   File: fraser.h
  *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
  *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: Timothy L Harris. A Pragmatic Implementation 
- *   of Non-blocking Linked Lists. DISC 2001.
- *   harris.h is part of ASCYLIB
+ *   Description: Lock-based skip list implementation of the Fraser algorithm
+ *   "Practical Lock Freedom", K. Fraser, 
+ *   PhD dissertation, September 2003
+ *   Cambridge University Technical Report UCAM-CL-TR-579 
+ *   fraser.h is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
  * 	     	      Tudor David <tudor.david@epfl.ch>
@@ -22,15 +24,9 @@
  *
  */
 
-#include "linkedlist.h"
+#include "skiplist.h"
+#include "ssalloc.h"
 
-/* ################################################################### *
- * HARRIS' LINKED LIST
- * ################################################################### */
-
-
-node_t* new_search(intset_t *set, skey_t key, node_t** left_node);
-sval_t new_find(intset_t *set, skey_t key);
-int new_insert(intset_t *set, skey_t key, sval_t val);
-sval_t new_delete(intset_t *set, skey_t key);
-int set_size(intset_t *set);
+sval_t fraser_find(sl_intset_t *set, skey_t key);
+sval_t fraser_remove(sl_intset_t *set, skey_t key);
+int fraser_insert(sl_intset_t *set, skey_t key, sval_t val);

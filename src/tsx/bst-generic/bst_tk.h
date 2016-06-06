@@ -1,9 +1,10 @@
 /*   
- *   File: intset.h
- *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
- *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: 
- *   intset.h is part of ASCYLIB
+ *   File: bst_tk.h
+ *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
+ *   Description: Asynchronized Concurrency: The Secret to Scaling Concurrent
+ *    Search Data Structures, Tudor David, Rachid Guerraoui, Vasileios Trigonakis,
+ *   ASPLOS '15
+ *   bst_tk.h is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
  * 	     	      Tudor David <tudor.david@epfl.ch>
@@ -21,9 +22,8 @@
  *
  */
 
-#include "harris.h"
+#include "bst.h"
 
-sval_t set_contains(intset_t *set, skey_t key);
-int set_add(intset_t *set, skey_t key, skey_t val);
-sval_t set_remove(intset_t *set, skey_t key);
-
+sval_t bst_tk_delete(intset_t* set, skey_t key);
+sval_t bst_tk_find(intset_t* set, skey_t key);
+int bst_tk_insert(intset_t* set, skey_t key, sval_t val);

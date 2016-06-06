@@ -1,8 +1,8 @@
 /*   
- *   File: test_simple.c
+ *   File: test_correct.c
  *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
  *   Description: 
- *   test_simple.c is part of ASCYLIB
+ *   test_correct.c is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
  * 	     	      Tudor David <tudor.david@epfl.ch>
@@ -40,7 +40,6 @@
 #include <malloc.h>
 #include "utils.h"
 #include "atomic_ops.h"
-#include "rapl_read.h"
 #ifdef __sparc__
 #  include <sys/types.h>
 #  include <sys/processor.h>
@@ -53,25 +52,23 @@
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,t)  set_contains(s, k)
-#define DS_ADD(s,k,t)       set_add(s, k, k)
-#define DS_REMOVE(s,k,t)    set_remove(s, k)
-#define DS_SIZE(s)          set_size(s)
-#define DS_NEW()            set_new()
+#define DS_CONTAINS(s,k)  sl_contains(s, k)
+#define DS_ADD(s,k,v)     sl_add(s, k, (sval_t) v)
+#define DS_REMOVE(s,k)    sl_remove(s, k)
+#define DS_SIZE(s)        sl_set_size(s)
+#define DS_NEW()          sl_set_new()
 
-#define DS_TYPE             intset_t
-#define DS_NODE             node_t
+#define DS_TYPE           sl_intset_t
+#define DS_NODE           sl_node_t
 
 /* ################################################################### *
  * GLOBALS
  * ################################################################### */
 
-RETRY_STATS_VARS_GLOBAL;
-
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
-size_t load_factor;
 size_t update = DEFAULT_UPDATE;
+size_t load_factor;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
 
@@ -87,7 +84,7 @@ uint32_t rand_max;
 #define rand_min 1
 
 static volatile int stop;
-TEST_VARS_GLOBAL;
+__thread uint32_t phys_id;
 
 volatile ticks *putting_succ;
 volatile ticks *putting_fail;
@@ -102,14 +99,7 @@ volatile ticks *getting_count_succ;
 volatile ticks *removing_count;
 volatile ticks *removing_count_succ;
 volatile ticks *total;
-#if defined(TSX_STATS)
-volatile ticks *tsx_trials[3];
-volatile ticks *tsx_commits;
-volatile ticks *tsx_aborts[3];
-#endif
-#if defined TSX_ABORT_REASONS
-volatile ticks *tsx_abort_reasons[TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER];
-#endif
+
 
 /* ################################################################### *
  * LOCALS
@@ -150,7 +140,6 @@ test(void* thread)
   volatile ticks my_removing_succ = 0;
   volatile ticks my_removing_fail = 0;
 #endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;
@@ -168,13 +157,14 @@ test(void* thread)
 #if GC == 1
   alloc = (ssmem_allocator_t*) malloc(sizeof(ssmem_allocator_t));
   assert(alloc != NULL);
-  ssmem_alloc_init_fs_size(alloc, SSMEM_DEFAULT_MEM_SIZE, SSMEM_GC_FREE_SET_SIZE, ID);
+  ssmem_alloc_init(alloc, SSMEM_DEFAULT_MEM_SIZE, ID);
+  ssmem_allocator_t* alloc_data = (ssmem_allocator_t*) malloc(sizeof(ssmem_allocator_t));
+  assert(alloc_data != NULL);
+  ssmem_alloc_init(alloc_data, SSMEM_DEFAULT_MEM_SIZE, ID);
 #endif
-
-  RR_INIT(phys_id);
-  barrier_cross(&barrier);
-
+    
   uint64_t key;
+  size_t* val = NULL;
   int c = 0;
   uint32_t scale_rem = (uint32_t) (update_rate * UINT_MAX);
   uint32_t scale_put = (uint32_t) (put_rate * UINT_MAX);
@@ -186,18 +176,24 @@ test(void* thread)
     {
       num_elems_thread++;
     }
-
-#if INITIALIZE_FROM_ONE == 1
-  num_elems_thread = (ID == 0) * initial;
-  key = range;
-#endif
-
+    
   for(i = 0; i < num_elems_thread; i++) 
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
-      if(DS_ADD(set, key, NULL) == false)
+      
+      if (val == NULL)
+	{
+	  val = (size_t*) ssmem_alloc(alloc_data, sizeof(size_t));
+	}
+      val[0] = key;
+
+      if(DS_ADD(set, key, val) == false)
 	{
 	  i--;
+	}
+      else
+	{
+	  val = NULL;
 	}
     }
   MEM_BARRIER;
@@ -209,21 +205,75 @@ test(void* thread)
       printf("#BEFORE size is: %zu\n", (size_t) DS_SIZE(set));
     }
 
-  RETRY_STATS_ZERO();
 
   barrier_cross(&barrier_global);
 
-  RR_START_SIMPLE();
-
   while (stop == 0) 
     {
-      TEST_LOOP(NULL);
+      c = (uint32_t)(my_random(&(seeds[0]),&(seeds[1]),&(seeds[2])));
+      key = (c & rand_max) + rand_min;
+
+      if (unlikely(c <= scale_put))
+	{
+	  if (val == NULL)
+	    {
+	      val = (size_t*) ssmem_alloc(alloc_data, sizeof(size_t));
+	    }
+	  val[0] = key;
+
+	  int res;
+	  START_TS(1);
+	  res = DS_ADD(set, key, val);
+	  END_TS(1, my_putting_count);
+	  if(res)
+	    {
+	      ADD_DUR(my_putting_succ);
+	      my_putting_count_succ++;
+	      val = NULL;
+	    }
+	  ADD_DUR_FAIL(my_putting_fail);
+	  my_putting_count++;
+	} 
+      else if(unlikely(c <= scale_rem))
+	{
+	  size_t* removed;
+	  START_TS(2);
+	  removed = (size_t*) DS_REMOVE(set, key);
+	  END_TS(2, my_removing_count);
+	  if(removed != NULL) 
+	    {
+	      ADD_DUR(my_removing_succ);
+	      my_removing_count_succ++;
+	      if (removed[0] != key)
+		{
+		  printf(" *[REM]* WRONG for key: %-10lu : %-10lu @ %p\n", key, removed[0], removed);
+		}
+	      ssmem_free(alloc_data, removed);
+	    }
+	  ADD_DUR_FAIL(my_removing_fail);
+	  my_removing_count++;
+	}
+      else
+	{ 
+	  size_t* res;
+	  START_TS(0);
+	  res = (size_t*) DS_CONTAINS(set, key);
+	  END_TS(0, my_getting_count);
+	  if(res != NULL) 
+	    {
+	      ADD_DUR(my_getting_succ);
+	      my_getting_count_succ++;
+	      if (res[0] != key)
+		{
+		  printf(" *[GET]* WRONG for key: %-10lu : %-10lu @ %p\n", key, res[0], res);
+		}
+	    }
+	  ADD_DUR_FAIL(my_getting_fail);
+	  my_getting_count++;
+	}
     }
 
-//  printf("Thread %d is out of the loop\n", (int) ID);
-
   barrier_cross(&barrier);
-  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -241,22 +291,6 @@ test(void* thread)
   removing_succ[ID] += my_removing_succ;
   removing_fail[ID] += my_removing_fail;
 #endif
-#if defined(TSX_STATS)
-  tsx_trials[0][ID] += my_tsx_trials[0];
-  tsx_trials[1][ID] += my_tsx_trials[1];
-  tsx_trials[2][ID] += my_tsx_trials[2];
-  tsx_commits[ID] += my_tsx_commits;
-  tsx_aborts[0][ID] += my_tsx_aborts[0];
-  tsx_aborts[1][ID] += my_tsx_aborts[1];
-  tsx_aborts[2][ID] += my_tsx_aborts[2];
-#endif
-#ifdef TSX_ABORT_REASONS
-  int j;
-  for (i=0; i<TSX_STATS_DEPTH; i++)
-    for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
-      tsx_abort_reasons[i][j][ID] += my_tsx_abort_reasons[i][j];
-#endif
-
   putting_count[ID] += my_putting_count;
   getting_count[ID] += my_getting_count;
   removing_count[ID]+= my_removing_count;
@@ -268,8 +302,6 @@ test(void* thread)
   EXEC_IN_DEC_ID_ORDER(ID, num_threads)
     {
       print_latency_stats(ID, SSPFD_NUM_ENTRIES, print_vals_num);
-      /* retry stats */
-      RETRY_STATS_SHARE();
     }
   EXEC_IN_DEC_ID_ORDER_END(&barrier);
 
@@ -277,8 +309,9 @@ test(void* thread)
 #if GC == 1
   ssmem_term();
   free(alloc);
+  free(alloc_data);
 #endif
-  THREAD_END();
+
   pthread_exit(NULL);
 }
 
@@ -372,6 +405,9 @@ main(int argc, char **argv)
 	case 'l':
 	  load_factor = atoi(optarg);
 	  break;
+	/* case 'b': */
+	/*   num_buckets_param = atoi(optarg); */
+	/*   break; */
 	case 'v':
 	  print_vals_num = atoi(optarg);
 	  break;
@@ -398,6 +434,7 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
+  printf("## Test correctness \n");
   printf("## Initial: %zu / Range: %zu\n", initial, range);
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
@@ -445,6 +482,8 @@ main(int argc, char **argv)
     
   stop = 0;
     
+  levelmax = floor_log_2((unsigned int) initial);
+
   DS_TYPE* set = DS_NEW();
   assert(set != NULL);
 
@@ -461,22 +500,7 @@ main(int argc, char **argv)
   getting_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count = (ticks *) calloc(num_threads , sizeof(ticks));
   removing_count_succ = (ticks *) calloc(num_threads , sizeof(ticks));
-#if defined(TSX_STATS)
-  tsx_trials[0] = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_trials[1] = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_trials[2] = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_commits = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_aborts[0] = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_aborts[1] = (ticks *) calloc(num_threads, sizeof(ticks));
-  tsx_aborts[2] = (ticks *) calloc(num_threads, sizeof(ticks));
-#endif
-#ifdef TSX_ABORT_REASONS 
-  int j;
-  for (i=0; i<TSX_STATS_DEPTH; i++)
-    for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
-      tsx_abort_reasons[i][j] = (ticks *) calloc(num_threads, sizeof(ticks));
-#endif
-
+    
   pthread_t threads[num_threads];
   pthread_attr_t attr;
   int rc;
@@ -504,7 +528,8 @@ main(int argc, char **argv)
 	}
         
     }
-      /* Free attribute and wait for the other threads */
+    
+  /* Free attribute and wait for the other threads */
   pthread_attr_destroy(&attr);
     
   barrier_cross(&barrier_global);
@@ -539,16 +564,7 @@ main(int argc, char **argv)
   volatile uint64_t getting_count_total_succ = 0;
   volatile uint64_t removing_count_total = 0;
   volatile uint64_t removing_count_total_succ = 0;
-#if defined(TSX_STATS)
-  volatile uint64_t tsx_trials_total[3] = {0, 0, 0};
-  volatile uint64_t tsx_commits_total = 0;
-  volatile uint64_t tsx_aborts_total[3] = {0, 0, 0};
-#endif
-#ifdef TSX_ABORT_REASONS
-  volatile uint64_t tsx_abort_reasons_total[TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]
-    = {{0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}};
-#endif
-   
+    
   for(t=0; t < num_threads; t++) 
     {
       PRINT_OPS_PER_THREAD();
@@ -564,20 +580,6 @@ main(int argc, char **argv)
       getting_count_total_succ += getting_count_succ[t];
       removing_count_total += removing_count[t];
       removing_count_total_succ += removing_count_succ[t];
-#if defined(TSX_STATS)
-      tsx_trials_total[0] += tsx_trials[0][t];
-      tsx_trials_total[1] += tsx_trials[1][t];
-      tsx_trials_total[2] += tsx_trials[2][t];
-      tsx_commits_total += tsx_commits[t];
-      tsx_aborts_total[0] += tsx_aborts[0][t];
-      tsx_aborts_total[1] += tsx_aborts[1][t];
-      tsx_aborts_total[2] += tsx_aborts[2][t];
-#endif
-#ifdef TSX_ABORT_REASONS
-      for (i=0; i<TSX_STATS_DEPTH; i++)
-        for (j=0; j<TSX_ABORT_REASONS_NUMBER; j++)
-          tsx_abort_reasons_total[i][j] += tsx_abort_reasons[i][j][t];
-#endif
     }
 
 #if defined(COMPUTE_LATENCY)
@@ -590,30 +592,7 @@ main(int argc, char **argv)
   long unsigned rem_fal = (removing_count_total - removing_count_total_succ) ? removing_fal_total / (removing_count_total - removing_count_total_succ) : 0;
   printf("%-7zu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu\n", num_threads, get_suc, get_fal, put_suc, put_fal, rem_suc, rem_fal);
 #endif
-#if defined(TSX_STATS)
-  printf("           %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n",
-         "commit_rate", "commits",
-         "trials_rnd1", "trials_rnd2", "trials_rnd3",
-         "aborts_rnd1", "aborts_rnd2", "aborts_rnd3");
-  printf("tsx stats :%-12f %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu\n",
-         (float)tsx_commits_total/tsx_trials_total[0], tsx_commits_total,
-         tsx_trials_total[0], tsx_trials_total[1], tsx_trials_total[2],
-         tsx_aborts_total[0], tsx_aborts_total[1], tsx_aborts_total[2]);
-  fflush(stdout);
-#endif
-#if defined(TSX_ABORT_REASONS)
-  printf("Abort reasons: %-12s %-12s %-12s %-12s %-12s %-12s | %-12s\n",
-         "explicit", "conflict", "capacity", "debug trap", "nested txn", "other", "retry");
-  for (i=0; i<TSX_STATS_DEPTH; i++)
-    printf("Trial %d      : %-12lu %-12lu %-12lu %-12lu %-12lu %-12lu | %-12lu\n",
-           i, tsx_abort_reasons_total[i][0], tsx_abort_reasons_total[i][1],
-           tsx_abort_reasons_total[i][2], tsx_abort_reasons_total[i][3],
-           tsx_abort_reasons_total[i][4], tsx_abort_reasons_total[i][5],
-           tsx_abort_reasons_total[i][6]);
-  fflush(stdout);
-#endif
-
-
+    
 #define LLU long long unsigned int
 
   int UNUSED pr = (int) (putting_count_total_succ - removing_count_total_succ);
@@ -641,11 +620,7 @@ main(int argc, char **argv)
   double throughput = (putting_count_total + getting_count_total + removing_count_total) * 1000.0 / duration;
   printf("#txs %zu\t(%-10.0f\n", num_threads, throughput);
   printf("#Mops %.3f\n", throughput / 1e6);
-
-  RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
-  RR_PRINT_CORRECTED();
-  RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
-
+    
   pthread_exit(NULL);
     
   return 0;

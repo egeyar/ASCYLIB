@@ -1,9 +1,8 @@
 /*   
- *   File: linkedlist.h
- *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
- *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
+ *   File: bst.h
+ *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
  *   Description: 
- *   linkedlist.h is part of ASCYLIB
+ *   bst.h is part of ASCYLIB
  *
  * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
  * 	     	      Tudor David <tudor.david@epfl.ch>
@@ -21,6 +20,9 @@
  *
  */
 
+#ifndef _H_BST_TK_
+#define _H_BST_TK_
+
 #include <assert.h>
 #include <getopt.h>
 #include <limits.h>
@@ -33,44 +35,42 @@
 #include <stdint.h>
 
 #include <atomic_ops.h>
-#include "atomic_ops_if.h"
+#include "lock_if.h"
 
 #include "common.h"
 #include "utils.h"
-#include "lock_if.h"
 #include "measurements.h"
 #include "ssalloc.h"
 #include "ssmem.h"
 
-#ifdef DEBUG
-#define IO_FLUSH                        fflush(NULL)
-/* Note: stdio is thread-safe */
-#endif
-
-#define DEFAULT_ALTERNATE		0
-#define DEFAULT_EFFECTIVE		1
-
 static volatile int stop;
 extern __thread ssmem_allocator_t* alloc;
 
-#define TRANSACTIONAL                   4
-
-typedef volatile struct node 
+typedef struct node
 {
   skey_t key;
-  sval_t val;
-  uint8_t padding32[8];
-  volatile struct node* next;
-#if defined(DO_PAD)
-  uint8_t padding[CACHE_LINE_SIZE - sizeof(sval_t) - sizeof(skey_t) - sizeof(struct node*)];
-#endif
+  union
+  {
+    sval_t val;
+    volatile uint64_t leaf;
+  };
+  volatile struct node* left;
+  volatile struct node* right;
+  volatile uint32_t locked;
+
+  uint8_t padding[CACHE_LINE_SIZE - 36];
 } node_t;
 
-typedef ALIGNED(CACHE_LINE_SIZE) struct intset 
+typedef ALIGNED(CACHE_LINE_SIZE) struct intset
 {
-  node_t *head;
+  node_t* head;
 } intset_t;
 
-node_t *new_node(skey_t key, sval_t val, node_t *next, int initializing);
-intset_t *set_new();
-void set_delete(intset_t *set);
+node_t* new_node(skey_t key, sval_t val, node_t* l, node_t* r, int initializing);
+node_t* new_node_no_init();
+intset_t* set_new();
+void set_delete(intset_t* set);
+int set_size(intset_t* set);
+void node_delete(node_t* node);
+
+#endif	/* _H_BST_TK_ */

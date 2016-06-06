@@ -1,7 +1,6 @@
 /*   
  *   File: intset.h
- *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
- *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
+ *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
  *   Description: 
  *   intset.h is part of ASCYLIB
  *
@@ -21,9 +20,8 @@
  *
  */
 
-#include "harris.h"
+#include "bst.h"
 
 sval_t set_contains(intset_t *set, skey_t key);
-int set_add(intset_t *set, skey_t key, skey_t val);
+int set_add(intset_t *set, skey_t key, sval_t val);
 sval_t set_remove(intset_t *set, skey_t key);
-

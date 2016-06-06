@@ -27,6 +27,8 @@
 RETRY_STATS_VARS;
 TSX_STATS_VARS;
 TSX_ABORT_REASONS_VARS;
+TSX_WITH_FALLBACK_VARS;
+#define DS_NODE node_t
 
 /*
  * harris_search looks for value val, it
@@ -41,18 +43,14 @@ new_search(intset_t *set, skey_t key, node_t **left_node)
 {
   node_t *prev;
   node_t *next;
-  do
+  prev = set->head;
+  next = prev->next;
+  while (next->key < key) 
     {
-      prev = set->head;
+      prev = next;
       next = prev->next;
-      while (next->key < key) 
-        {
-          prev = next;
-          next = prev->next;
-        }
-      *left_node = prev;
     }
-  while (unlikely(prev->next != next));
+  *left_node = prev;
   return next;
 }
 
@@ -81,52 +79,39 @@ int
 new_insert(intset_t *set, skey_t key, sval_t val) 
 {
   node_t *newnode = NULL, *prev, *next = NULL;
-  do
-    {
 retry:
-      UPDATE_TRY();
-      next = new_search(set, key, &prev);
-      if (next->key == key)
-        {
+  UPDATE_TRY();
+  next = new_search(set, key, &prev);
+  if (next->key == key)
+    {
 #if GC == 1
-	  if (unlikely(newnode != NULL))
-	    {
-	      ssmem_free(alloc, (void*) newnode);
-	    }
-#endif
-          return 0;
-        }
-
-      if (prev->key > next->key)
-          continue;
-
-      if (likely(newnode == NULL))
-	{
-	  newnode = new_node(key, val, next, 0);
-	}
-      else
-	{
-	  newnode->next = next;
-	}
-
-      TSX_CRITICAL_SECTION
+      if (unlikely(newnode != NULL))
         {
-          /* The first condition is to check that they are still adjacent.
-           * The second one is to make sure that 'prev' is not marked deleted. */
-          if (unlikely(prev->next != next))
-            {
-              TSX_ABORT;
-            }
-          prev->next = newnode;
-          TSX_COMMIT;
-          return 1;
+          ssmem_free(alloc, (void*) newnode);
         }
-      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
-
-      if (ATOMIC_CAS_MB(&prev->next, next, newnode))
-          return 1;
+#endif
+      return 0;
     }
-  while(1);
+
+  if (likely(newnode == NULL))
+    {
+      newnode = new_node(key, val, next, 0);
+    }
+  else
+    {
+      newnode->next = next;
+    }
+
+  TSX_WITH_FALLBACK_BEGIN();
+  TSX_PROTECT_NODE(prev, retry);
+  TSX_PROTECT_NODE(next, retry);
+  /* Firstly, to check that they are still adjacent.
+   * Secondly, to make sure that 'prev' is not marked deleted. */
+  TSX_VALIDATE(prev->next == next, retry);
+  prev->next = newnode;
+  TSX_WITH_FALLBACK_END();
+
+  return 1;
 }
 
 /*
@@ -137,50 +122,56 @@ retry:
 sval_t
 new_delete(intset_t *set, skey_t key)
 {
-  node_t *prev, *next = NULL, *next_next = NULL;
-  do
-    {
+  node_t *prev, *next = NULL;
 retry:
-      UPDATE_TRY();
-      next = new_search(set, key, &prev);
-      if (next->key != key)
-        {
-          return 0;
-        }
-      TSX_CRITICAL_SECTION
-        {
-          if (unlikely(prev->next != next || next->key > next->next->key))
-            {
-              TSX_ABORT;
-            }
-          prev->next = next->next;
-          next->next = prev;
-          TSX_COMMIT;
-#if GC == 1
-          ssmem_free(alloc, (void*) next);
-#endif
-          return 1;
-        }
-      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
-
-      next_next = next->next;
-      if (next->key > next_next->key
-          || !ATOMIC_CAS_MB(&next->next, next_next, prev))
-          continue;
-      if (ATOMIC_CAS_MB(&prev->next, next, next_next))
-        {
-#if GC == 1
-          ssmem_free(alloc, (void*) next);
-#endif
-          return 1;
-        }
-      else
-        {
-          next->next = next_next;
-          next_next = NULL;
-        }
+  UPDATE_TRY();
+  next = new_search(set, key, &prev);
+  if (next->key != key)
+    {
+      return 0;
     }
-  while(1);
+
+  TSX_CRITICAL_SECTION
+    { 
+      if (unlikely(prev->next != next || prev->locked || next->locked))
+        {
+          TSX_ABORT;
+        }
+      prev->next = next->next;
+      next->next = prev;
+      TSX_COMMIT;
+#if GC == 1
+      ssmem_free(alloc, (void*) next);
+#endif
+      return 1;
+    }
+  TSX_AFTER;
+  
+  if (!ATOMIC_CAS_MB(&prev->locked, 0, 1))
+    {
+      goto retry;
+    }
+  if (!ATOMIC_CAS_MB(&next->locked, 0, 1))
+    {
+      prev->locked = 0;
+      goto retry;
+    }
+
+  /*If valid*/
+  if (prev->next == next)
+    {
+      prev->next = next->next;
+      next->next = prev;
+      next->locked = 0;
+      prev->locked = 0;
+      return 1;
+    }
+  else 
+    {
+      next->locked = 0;
+      prev->locked = 0;
+      goto retry;
+    }
 }
 
 int

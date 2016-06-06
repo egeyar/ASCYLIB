@@ -289,9 +289,9 @@ extern __thread ticks my_tsx_trials[3], my_tsx_commits, my_tsx_aborts[3]
 
 EXTERN_TSX_STATS_VARS;
 
-#    define TSX_STATS_ABORTS(i)    (my_tsx_aborts[i]++)
-#    define TSX_STATS_TRIALS(i)    (my_tsx_trials[i]++)
-#    define TSX_STATS_COMMITS()    (my_tsx_commits++)
+#    define TSX_STATS_ABORTS(i)     if(i<TSX_STATS_DEPTH) my_tsx_aborts[i]++
+#    define TSX_STATS_TRIALS(i)     if(i<TSX_STATS_DEPTH) my_tsx_trials[i]++
+#    define TSX_STATS_COMMITS()     my_tsx_commits++
 #  else /*if !defined TSX_STATS*/
 #    define TSX_STATS_VARS
 #    define EXTERN_TSX_STATS_VARS
@@ -352,15 +352,16 @@ EXTERN_TSX_ABORT_REASONS_VARS;
 #  endif
 
 
-#  ifndef TSX_NESTED_TXN
 static __thread uint64_t tsx_depth = 0;
+#  ifndef TSX_NESTED_TXN
+#    define TSX_IN_TXN()                 (tsx_depth>0)
 #    define TSX_DEPTH_INC()              (tsx_depth++)
 #    define TSX_DEPTH_DEC()              (tsx_depth--)
 #    define TSX_IS_COMMITTABLE()         (tsx_depth == 1)
 #    define TSX_USE_CURRENT_TXN()        (tsx_depth > 1)
 #  else /* if defined TSX_MULTIPLE_TXN */
-#    define TSX_DEPTH_INC()
-#    define TSX_DEPTH_DEC()
+#    define TSX_DEPTH_INC()              (tsx_depth++)
+#    define TSX_DEPTH_DEC()              (tsx_depth--)
 #    define TSX_IS_COMMITTABLE()         (1)
 #    define TSX_USE_CURRENT_TXN()        (0)
 #  endif
@@ -405,8 +406,6 @@ if (unlikely(!TSX_CONFLICT_TOO_HIGH))          \
       TSX_DEPTH_DEC();                         \
       TSX_STATS_ABORTS(t);                     \
       TSX_ABORT_REASON(t, status);             \
-      if (status & _XABORT_EXPLICIT)           \
-        break;                                 \
       if (!(status & _XABORT_RETRY))           \
         break;                                 \
       pause_rep((1<<((1+t)*5)) & 255);         \
@@ -438,6 +437,119 @@ if (TSX_IS_COMMITTABLE()) {                    \
 }                                              \
 TSX_DEPTH_DEC();
 
+static ptlock_t global_tsx_lock = TAS_FREE; 
+#  define TSX_LOCK()           tsx_lock(&global_tsx_lock)
+
+#  define TSX_UNLOCK(commit)                                   \
+if (global_tsx_lock == TAS_FREE)                               \
+  {                                                            \
+    if (commit) {TSX_COMMIT;}                                  \
+    else {TSX_ABORT;}                                          \
+  }                                                            \
+else                                                           \
+  {                                                            \
+    __atomic_clear(&global_tsx_lock, __ATOMIC_RELEASE);        \
+  }
+
+#  define TSX_FALLBACK_LOCK()    tsx_fallback_lock(&global_tsx_lock);
+#  define TSX_FALLBACK_UNLOCK()  tsx_fallback_unlock(&global_tsx_lock);
+
+extern __thread void *tsx_markedNodes[5];
+extern __thread uint64_t tsx_markedNo;
+#  define TSX_WITH_FALLBACK_VARS               \
+     __thread void *tsx_markedNodes[5];        \
+     __thread uint64_t tsx_markedNo;
+
+
+#  ifndef NO_TSX
+#    define TSX_WITH_FALLBACK_BEGIN()            twf_begin()
+#    define TWF_SLOW_PATH_END()                                \
+     int tsx_i;                                                \
+     for(tsx_i = 0; tsx_i < tsx_markedNo; tsx_i++)             \
+     {                                                         \
+       ((DS_NODE*)tsx_markedNodes[tsx_i])->locked = 0;         \
+     }                                                         \
+     tsx_markedNo=0;
+
+#    define TSX_PROTECT_NODE(np, failPath)                     \
+     if (TSX_IN_TXN())                                         \
+     {                                                         \
+       if (np->locked)                                         \
+       {                                                       \
+         TSX_ABORT;                                            \
+       }                                                       \
+     }                                                         \
+     else                                                      \
+     {                                                         \
+       if(!CAS_U32_bool(&np->locked, 0, 1))                   \
+       {                                                       \
+         TWF_SLOW_PATH_END();                                  \
+         goto failPath;                                        \
+       }                                                       \
+       else                                                    \
+       {                                                       \
+         tsx_markedNodes[tsx_markedNo] = (void *) np;          \
+         tsx_markedNo++;                                       \
+       }                                                       \
+     }
+
+#    define TSX_VALIDATE(cond, failPath)                       \
+     if (!(cond))                                              \
+     {                                                         \
+       if (TSX_IN_TXN())                                       \
+       {                                                       \
+         TSX_ABORT;                                            \
+       }                                                       \
+       else                                                    \
+       {                                                       \
+         TWF_SLOW_PATH_END();                                  \
+         goto failPath;                                        \
+       }                                                       \
+     }
+
+#    define TSX_WITH_FALLBACK_END()                            \
+     if (TSX_IN_TXN())                                         \
+     {                                                         \
+       TSX_COMMIT;                                             \
+     }                                                         \
+     else                                                      \
+     {                                                         \
+       TWF_SLOW_PATH_END();                                    \
+     }
+
+#  else
+#    define TSX_WITH_FALLBACK_BEGIN()
+#    define TWF_SLOW_PATH_END()                                \
+     int tsx_i;                                                \
+     for(tsx_i = 0; tsx_i < tsx_markedNo; tsx_i++)             \
+     {                                                         \
+       ((DS_NODE*)tsx_markedNodes[tsx_i])->locked = 0;         \
+     }                                                         \
+     tsx_markedNo=0;
+
+#    define TSX_PROTECT_NODE(np, failPath)                     \
+     if(!CAS_U32_bool(&np->locked, 0, 1))                      \
+     {                                                         \
+       TWF_SLOW_PATH_END();                                    \
+       goto failPath;                                          \
+     }                                                         \
+     else                                                      \
+     {                                                         \
+       tsx_markedNodes[tsx_markedNo] = (void *) np;            \
+       tsx_markedNo++;                                         \
+     }
+
+#    define TSX_VALIDATE(cond, failPath)                       \
+     if (!(cond))                                              \
+     {                                                         \
+       TWF_SLOW_PATH_END();                                    \
+       goto failPath;                                          \
+     }
+
+#    define TSX_WITH_FALLBACK_END()                            \
+     TWF_SLOW_PATH_END();
+#  endif
+
 
 static inline void
 tsx_init(ptlock_t* l)
@@ -447,7 +559,17 @@ tsx_init(ptlock_t* l)
   MEM_BARRIER;
 #  endif
 }
-  
+
+static inline void
+twf_begin()
+{
+  TSX_CRITICAL_SECTION
+  {
+    return;
+  }
+  TSX_AFTER;
+}
+
 static inline uint32_t
 tsx_CAS(volatile size_t * addr, volatile size_t oldValue, volatile size_t newValue)
 {
@@ -517,6 +639,16 @@ tsx_lock(ptlock_t* l)
 }
 
 static inline uint32_t
+tsx_fallback_lock(ptlock_t* l)
+{
+  while (*l != TAS_FREE || __atomic_exchange_n(l, TAS_LCKD, __ATOMIC_ACQUIRE))
+  {
+    PAUSE;
+  }
+  return 0;
+}
+
+static inline uint32_t
 tsx_trylock(ptlock_t* l)
 {
   return ((ptlock_t*)tsx_CAS_PTR((uint64_t*)l, (uint64_t)TAS_FREE, (uint64_t)TAS_LCKD) == TAS_FREE);
@@ -535,6 +667,14 @@ tsx_unlock(ptlock_t* l)
   }
   return 0;
 }
+
+static inline uint32_t
+tsx_fallback_unlock(ptlock_t* l)
+{
+  __atomic_clear(l, __ATOMIC_RELEASE);
+  return 0;
+}
+
 
 #elif defined(TICKET)			/* ticket lock */
 

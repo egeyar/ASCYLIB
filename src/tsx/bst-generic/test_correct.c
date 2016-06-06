@@ -52,14 +52,14 @@
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k)  set_contains(s, k)
-#define DS_ADD(s,k,v)     set_add(s, k, (sval_t) v)
-#define DS_REMOVE(s,k)    set_remove(s, k)
-#define DS_SIZE(s)        set_size(s)
-#define DS_NEW()          set_new()
+#define DS_CONTAINS(s,k,t)  set_contains_l(s, k, t)
+#define DS_ADD(s,k,v,t)     set_add_l(s, k, (sval_t) v, t)
+#define DS_REMOVE(s,k,t)    set_remove_l(s, k, t)
+#define DS_SIZE(s)          set_size_l(s)
+#define DS_NEW()            set_new_l()
 
-#define DS_TYPE           intset_t
-#define DS_NODE           node_t
+#define DS_TYPE             intset_l_t
+#define DS_NODE             node_l_t
 
 /* ################################################################### *
  * GLOBALS
@@ -71,6 +71,7 @@ size_t load_factor;
 size_t update = DEFAULT_UPDATE;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
+int algo_type = DEFAULT_LOCKTYPE;
 
 size_t print_vals_num = 100; 
 size_t pf_vals_num = 1023;
@@ -191,7 +192,7 @@ test(void* thread)
 	}
       val[0] = key;
 
-      if(DS_ADD(set, key, val) == false)
+      if(DS_ADD(set, key, val, ALGO_TYPE) == false)
 	{
 	  i--;
 	}
@@ -227,7 +228,7 @@ test(void* thread)
 
 	  int res;
 	  START_TS(1);
-	  res = DS_ADD(set, key, val);
+	  res = DS_ADD(set, key, val, ALGO_TYPE);
 	  END_TS(1, my_putting_count);
 	  if(res)
 	    {
@@ -242,7 +243,7 @@ test(void* thread)
 	{
 	  size_t* removed;
 	  START_TS(2);
-	  removed = (size_t*) DS_REMOVE(set, key);
+	  removed = (size_t*) DS_REMOVE(set, key, ALGO_TYPE);
 	  END_TS(2, my_removing_count);
 	  if(removed != NULL) 
 	    {
@@ -261,7 +262,7 @@ test(void* thread)
 	{ 
 	  size_t* res;
 	  START_TS(0);
-	  res = (size_t*) DS_CONTAINS(set, key);
+	  res = (size_t*) DS_CONTAINS(set, key, ALGO_TYPE);
 	  END_TS(0, my_getting_count);
 	  if(res != NULL) 
 	    {
@@ -344,7 +345,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:x:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -385,6 +386,11 @@ main(int argc, char **argv)
 		 "        When using detailed profiling, how many values to print.\n"
 		 "  -f, --val-pf <int>\n"
 		 "        When using detailed profiling, how many values to keep track of.\n"
+		 "  -x, --lock-based algorithm (default=1)\n"
+		 "        Use lock-based algorithm\n"
+		 "        1 = lock-coupling,\n"
+		 "        2 = lazy algorithm\n"
+		 "        3 = Pugh's lazy algorithm\n"
 		 , argv[0]);
 	  exit(0);
 	case 'd':
@@ -408,6 +414,9 @@ main(int argc, char **argv)
 	  break;
 	case 'l':
 	  load_factor = atoi(optarg);
+	  break;
+	case 'x':
+	  algo_type = atoi(optarg);
 	  break;
 	case 'v':
 	  print_vals_num = atoi(optarg);
@@ -436,7 +445,19 @@ main(int argc, char **argv)
     }
 
   printf("## Test correctness \n");
-  printf("## Initial: %zu / Range: %zu\n", initial, range);
+  printf("## Initial: %zu / Range: %zu / ", initial, range);
+  switch (algo_type)
+    {
+    case 1:
+      printf("handover-hand locks");
+      break;
+    case 2:
+      printf("lazy locks");
+      break;
+    default:
+      printf("Pugh's lazy locks");
+    }
+  printf("\n");
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
   double mb = kb / 1024.0;

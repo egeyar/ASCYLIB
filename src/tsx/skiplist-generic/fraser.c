@@ -28,6 +28,8 @@
 RETRY_STATS_VARS;
 TSX_STATS_VARS;
 TSX_ABORT_REASONS_VARS;
+TSX_WITH_FALLBACK_VARS;
+#define DS_NODE sl_node_t
 
 #include "latency.h"
 #if LATENCY_PARSING == 1
@@ -111,9 +113,9 @@ fraser_remove(sl_intset_t *set, skey_t key)
   int i;
   sval_t result = 0;
 
-  UPDATE_TRY();
-
   PARSE_START_TS(2);
+retry1:
+  UPDATE_TRY();
   fraser_search(set, key, preds, succs, 0);
   PARSE_END_TS(2, lat_parsing_rem++);
 
@@ -123,28 +125,28 @@ fraser_remove(sl_intset_t *set, skey_t key)
     {
       return 0;
     }
-
-  if (unlikely(ATOMIC_FETCH_AND_INC_FULL(&succs[0]->deleted) != 0))
-    {
-      return 0;
-    }
+  
+  TSX_WITH_FALLBACK_BEGIN();
+  TSX_PROTECT_NODE(curr, retry1);
+  TSX_VALIDATE(!curr->deleted, end);
+  curr->deleted = 1;
+  TSX_WITH_FALLBACK_END();
 
   for (i = curr->toplevel-1; i >= 0; i--) 
     {
 nextlevel:
-      toplevel = curr->toplevel;
-      TSX_CRITICAL_SECTION
-        {
+      while(1) 
+	{
+          TSX_WITH_FALLBACK_BEGIN();
+          TSX_PROTECT_NODE(preds[i], retry2);
+          TSX_PROTECT_NODE(curr, retry2);
           if (i < curr->toplevel)
             {
-              if (/*preds[i]->deleted*/ || preds[i]->next[i] != curr)
-                {
-                  TSX_ABORT;
-                }
+              TSX_VALIDATE(preds[i]->next[i] == curr, retry2);
               preds[i]->next[i] = curr->next[i];
+              curr->next[i] = preds[i];
             }
-          curr->next[i] = preds[i];
-          TSX_COMMIT;
+          TSX_WITH_FALLBACK_END();
           if (--i >= 0)
             {
               goto nextlevel;
@@ -153,33 +155,16 @@ nextlevel:
             {
               goto success;
             }
+retry2:
+          fraser_search(set, key, preds, succs, i);
         }
-      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
-
-      while(1) /*Fallback Path*/
-	{
-	  curr_next = curr->next[i];
-	  if (ATOMIC_CAS_MB(&curr->next[i], curr_next, preds[i]))
-            {
-              if (ATOMIC_CAS_MB(&preds[i]->next[i], curr, curr_next) || i >= curr->toplevel)
-                {
-                  break;
-                }
-              else
-                {
-                  curr->next[i] = curr_next;
-                }
-            }
-retry:
-	  fraser_search(set, key, preds, succs, i);
-	}
     }
 success:
-    result = curr->val;
+  result = curr->val;
 #if GC == 1
-      ssmem_free(alloc, (void*) curr);
+  ssmem_free(alloc, (void*) curr);
 #endif
-
+end:
   return result;
 }
 
@@ -192,7 +177,7 @@ fraser_insert(sl_intset_t *set, skey_t key, sval_t val)
   int result = 0;
 
   PARSE_START_TS(1);
-retry: 	
+retry1: 	
   UPDATE_TRY();
 
   fraser_search(set, key, preds, succs, 0);
@@ -224,14 +209,16 @@ retry:
   MEM_BARRIER;
 #endif
 
-  /* Node is visible once inserted at lowest level */
-  if (!ATOMIC_CAS_MB(&preds[0]->next[0], succs[0], new))
-    {
-      goto retry;
-    }
+  TSX_WITH_FALLBACK_BEGIN();
+  TSX_PROTECT_NODE(preds[0], retry1);
+  TSX_PROTECT_NODE(new, retry1);
+  TSX_VALIDATE(preds[0]->next[0] == succs[0], retry1);
+  preds[0]->next[0] = new;
+  TSX_WITH_FALLBACK_END();
 
   for (i = 1; i < new->toplevel; i++) 
     {
+nextlevel:
       while (1)
 	{
 	  /* Update the forward pointer if it is stale */
@@ -241,11 +228,27 @@ retry:
               new->toplevel = i;
 	      goto success;
 	    }
-	  if (((new_next == succs[i]) || ATOMIC_CAS_MB(&new->next[i], new_next, succs[i]))
-              && ATOMIC_CAS_MB(&preds[i]->next[i], succs[i], new))
-	    break;
 
-	  fraser_search(set, key, preds, succs, i);
+          TSX_WITH_FALLBACK_BEGIN();
+          TSX_PROTECT_NODE(preds[i], retry2);
+          TSX_PROTECT_NODE(new, retry2);
+          TSX_VALIDATE(preds[i]->next[i] == succs[i], retry2);
+          if (new->next[i] != succs[i])
+            {
+              new->next[i] = succs[i];
+            }
+          preds[i]->next[i] = new;
+          TSX_WITH_FALLBACK_END();
+          if (++i < new->toplevel)
+            {
+              goto nextlevel;
+            }
+          else
+            {
+              goto success;
+            }
+retry2:
+          fraser_search(set, key, preds, succs, i);
 	}
     }
 

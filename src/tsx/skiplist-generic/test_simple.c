@@ -53,14 +53,14 @@
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,t)  set_contains(s, k)
-#define DS_ADD(s,k,t)       set_add(s, k, k)
-#define DS_REMOVE(s,k,t)    set_remove(s, k)
-#define DS_SIZE(s)          set_size(s)
-#define DS_NEW()            set_new()
+#define DS_CONTAINS(s,k,t)  sl_contains(s, k)
+#define DS_ADD(s,k,t)       sl_add(s, k, k)
+#define DS_REMOVE(s,k,t)    sl_remove(s, k)
+#define DS_SIZE(s)          sl_set_size(s)
+#define DS_NEW()            sl_set_new()
 
-#define DS_TYPE             intset_t
-#define DS_NODE             node_t
+#define DS_TYPE             sl_intset_t
+#define DS_NODE             sl_node_t
 
 /* ################################################################### *
  * GLOBALS
@@ -70,8 +70,8 @@ RETRY_STATS_VARS_GLOBAL;
 
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
-size_t load_factor;
 size_t update = DEFAULT_UPDATE;
+size_t load_factor;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
 
@@ -150,7 +150,6 @@ test(void* thread)
   volatile ticks my_removing_succ = 0;
   volatile ticks my_removing_fail = 0;
 #endif
-
   uint64_t my_putting_count = 0;
   uint64_t my_getting_count = 0;
   uint64_t my_removing_count = 0;
@@ -189,12 +188,11 @@ test(void* thread)
 
 #if INITIALIZE_FROM_ONE == 1
   num_elems_thread = (ID == 0) * initial;
-  key = range;
 #endif
 
   for(i = 0; i < num_elems_thread; i++) 
     {
-      key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
+      key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;      
       if(DS_ADD(set, key, NULL) == false)
 	{
 	  i--;
@@ -219,8 +217,6 @@ test(void* thread)
     {
       TEST_LOOP(NULL);
     }
-
-//  printf("Thread %d is out of the loop\n", (int) ID);
 
   barrier_cross(&barrier);
   RR_STOP_SIMPLE();
@@ -268,7 +264,6 @@ test(void* thread)
   EXEC_IN_DEC_ID_ORDER(ID, num_threads)
     {
       print_latency_stats(ID, SSPFD_NUM_ENTRIES, print_vals_num);
-      /* retry stats */
       RETRY_STATS_SHARE();
     }
   EXEC_IN_DEC_ID_ORDER_END(&barrier);
@@ -445,6 +440,15 @@ main(int argc, char **argv)
     
   stop = 0;
     
+  levelmax = floor_log_2((unsigned int) initial);
+  size_pad_32 = sizeof(sl_node_t) + (levelmax * sizeof(sl_node_t *));
+  while (size_pad_32 & 31)
+    {
+      size_pad_32++;
+    }
+
+  printf("size of node padded: %u\n", size_pad_32);
+
   DS_TYPE* set = DS_NEW();
   assert(set != NULL);
 
@@ -504,7 +508,8 @@ main(int argc, char **argv)
 	}
         
     }
-      /* Free attribute and wait for the other threads */
+    
+  /* Free attribute and wait for the other threads */
   pthread_attr_destroy(&attr);
     
   barrier_cross(&barrier_global);
@@ -548,7 +553,7 @@ main(int argc, char **argv)
   volatile uint64_t tsx_abort_reasons_total[TSX_STATS_DEPTH][TSX_ABORT_REASONS_NUMBER]
     = {{0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0}};
 #endif
-   
+
   for(t=0; t < num_threads; t++) 
     {
       PRINT_OPS_PER_THREAD();
@@ -644,8 +649,8 @@ main(int argc, char **argv)
 
   RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
   RR_PRINT_CORRECTED();
-  RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
-
+  RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);
+    
   pthread_exit(NULL);
     
   return 0;

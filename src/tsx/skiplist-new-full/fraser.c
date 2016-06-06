@@ -26,6 +26,8 @@
 #include "fraser.h"
 
 RETRY_STATS_VARS;
+TSX_STATS_VARS;
+TSX_ABORT_REASONS_VARS;
 
 #include "latency.h"
 #if LATENCY_PARSING == 1
@@ -129,7 +131,31 @@ fraser_remove(sl_intset_t *set, skey_t key)
 
   for (i = curr->toplevel-1; i >= 0; i--) 
     {
-      while(1)
+nextlevel:
+      TSX_CRITICAL_SECTION
+        {
+          if (i < curr->toplevel)
+            {
+              if (/*preds[i]->deleted*/ || preds[i]->next[i] != curr)
+                {
+                  TSX_ABORT;
+                }
+              preds[i]->next[i] = curr->next[i];
+            }
+          curr->next[i] = preds[i];
+          TSX_COMMIT;
+          if (--i >= 0)
+            {
+              goto nextlevel;
+            }
+          else
+            {
+              goto success;
+            }
+        }
+      TSX_END_EXPLICIT_ABORTS_GOTO(retry);
+
+      while(1) /*Fallback Path*/
 	{
 	  curr_next = curr->next[i];
 	  if (ATOMIC_CAS_MB(&curr->next[i], curr_next, preds[i]))
@@ -143,9 +169,12 @@ fraser_remove(sl_intset_t *set, skey_t key)
                   curr->next[i] = curr_next;
                 }
             }
+
+retry:
 	  fraser_search(set, key, preds, succs, i);
 	}
     }
+success:
     result = curr->val;
 #if GC == 1
       ssmem_free(alloc, (void*) curr);

@@ -2,7 +2,7 @@ ROOT = ../../..
 
 include $(ROOT)/common/Makefile.common
 
-BINS = $(BINDIR)/lf-sl_new
+BINS = $(BINDIR)/tsx-sl_generic
 PROF = $(ROOT)/src
 
 .PHONY:	all clean

@@ -344,6 +344,10 @@ ifeq ($(TSX_NESTED_TXN),1)
 	CFLAGS += -DTSX_NESTED_TXN
 endif
 
+ifeq ($(NO_TSX),1)
+	CFLAGS += -DNO_TSX
+endif
+
 ifeq ($(TSX_SMART),1)
 	CFLAGS += -DTSX_SMART
 endif
