@@ -107,7 +107,7 @@ fraser_find(sl_intset_t *set, skey_t key)
 sval_t
 fraser_remove(sl_intset_t *set, skey_t key)
 {
-  sl_node_t *curr, *curr_next;
+  sl_node_t *curr;
   sl_node_t* preds[FRASER_MAX_MAX_LEVEL];
   sl_node_t* succs[FRASER_MAX_MAX_LEVEL];
   int i;
@@ -171,7 +171,7 @@ end:
 int
 fraser_insert(sl_intset_t *set, skey_t key, sval_t val) 
 {
-  sl_node_t *new = NULL, *new_next;
+  sl_node_t *new = NULL;
   sl_node_t *succs[FRASER_MAX_MAX_LEVEL], *preds[FRASER_MAX_MAX_LEVEL];
   int i;
   int result = 0;
@@ -222,7 +222,6 @@ nextlevel:
       while (1)
 	{
 	  /* Update the forward pointer if it is stale */
-	  new_next = new->next[i];
 	  if (new->deleted) /* If new is deleted*/
 	    {
               new->toplevel = i;

@@ -136,7 +136,7 @@ nextlevel:
         {
           if (i < curr->toplevel)
             {
-              if (/*preds[i]->deleted*/ || preds[i]->next[i] != curr)
+              if (/*preds[i]->deleted ||*/ preds[i]->next[i] != curr)
                 {
                   TSX_ABORT;
                 }

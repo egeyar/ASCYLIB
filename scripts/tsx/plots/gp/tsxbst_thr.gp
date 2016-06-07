@@ -33,10 +33,10 @@ OFFSET           =    1
 column_select(i) = column(FIRST + ((i-1)*OFFSET)) / (DIV);
 
 LINE0 = '"bst-tk"'
-LINE1 = '"tsx-bst-tk"'
-LINE2 = '"aravind"'
-LINE3 = '"tsx-aravind-cas"'
-LINE4 = '"tsx-aravind"'
+LINE1 = '"aravind"'
+LINE2 = '"bst-generic"'
+LINE3 = '"bst-generic-fallback"'
+LINE4 = '"bst-generic-smart"'
 
 PLOT0 = '"Low Contention\n{(65536 elements)}"'
 PLOT1 = '"Medium contention\n{(16384 elements)}"'

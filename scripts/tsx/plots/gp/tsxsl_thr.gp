@@ -14,7 +14,7 @@ set lmargin 3
 set tmargin 3
 set bmargin 2.5
 
-n_algo = 7
+n_algo = 5
 
 title_offset   = -0.5
 top_row_y      = 1.76
@@ -33,12 +33,12 @@ OFFSET           =    1
 column_select(i) = column(FIRST + ((i-1)*OFFSET)) / (DIV);
 
 LINE0 = '"herlihy"'
-LINE1 = '"tsx-herlihy"'
-LINE2 = '"fraser"'
-LINE3 = '"tsx-fraser-cas"'
-LINE4 = '"tsx-fraser"'
-LINE5 = '"pugh"'
-LINE6 = '"tsx-pugh"'
+LINE1 = '"fraser"'
+LINE2 = '"pugh"'
+LINE3 = '"node-locks"'
+LINE4 = '"node-locks-fb"'
+LINE5 = '"new-fallback"'
+LINE6 = '"new"'
 
 PLOT0 = '"Low Contention\n{(65536 elements)}"'
 PLOT1 = '"Medium contention\n{(16384 elements)}"'
@@ -287,9 +287,7 @@ plot \
      NaN title @LINE1 ls 2 with linespoints, \
      NaN title @LINE2 ls 3 with linespoints, \
      NaN title @LINE3 ls 4 with linespoints, \
-     NaN title @LINE4 ls 5 with linespoints, \
-     NaN title @LINE5 ls 6 with linespoints, \
-     NaN title @LINE6 ls 7 with linespoints
+     NaN title @LINE4 ls 5 with linespoints
 
 #</null>
 unset multiplot  #<--- Necessary for some terminals, but not postscript I don't thin

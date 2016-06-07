@@ -15,7 +15,7 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/lb-bst_tk ${ub}/tsx-bst_tk ${ub}/lf-bst_aravind ${ub}/tsx-bst_aravind_cas ${ub}/tsx-bst_aravind_tsx );
+algos=( ${ub}/lb-bst_tk ${ub}/lf-bst_aravind ${ub}/tsx-bst_generic ${ub}/lf-bst_generic ${ub}/tsx-bst_new ${ub}/lf-bst_new );
 
 params_i=( 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 );
 params_u=( 80   80    80    60   60    60    40   40    40    20   20    20    10   10    10    );

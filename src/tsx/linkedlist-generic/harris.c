@@ -131,6 +131,21 @@ retry:
       return 0;
     }
 
+  TSX_WITH_FALLBACK_BEGIN();
+  TSX_PROTECT_NODE(prev, retry);
+  TSX_PROTECT_NODE(next, retry);
+  /* Firstly, to check that they are still adjacent.
+   * Secondly, to make sure that 'prev' is not marked deleted. */
+  TSX_VALIDATE(prev->next == next, retry);
+  prev->next = next->next;
+  next->next = prev;
+  TSX_WITH_FALLBACK_END();
+#if GC == 1
+  ssmem_free(alloc, (void*) next);
+#endif
+  return 1;
+
+/*
   TSX_CRITICAL_SECTION
     { 
       if (unlikely(prev->next != next || prev->locked || next->locked))
@@ -157,7 +172,6 @@ retry:
       goto retry;
     }
 
-  /*If valid*/
   if (prev->next == next)
     {
       prev->next = next->next;
@@ -172,6 +186,7 @@ retry:
       prev->locked = 0;
       goto retry;
     }
+*/
 }
 
 int

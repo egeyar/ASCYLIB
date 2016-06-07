@@ -155,7 +155,7 @@ TSX_CRITICAL_SECTION                                                   \
     goto success;                                                      \
   }                                                                    \
 TSX_END_EXPLICIT_ABORTS_GOTO(retry);                                   \
-sibling = pred->branchnoty;                                            \
+sibling = (node_t *) pred->branchnoty;                                 \
 node_t *leftchild  = right ? sibling : curr,                           \
        *rightchild = right ? curr : sibling;                           \
 if (unlikely(pred==set->head || sibling == set->head                   \

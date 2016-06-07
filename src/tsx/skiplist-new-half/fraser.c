@@ -132,12 +132,11 @@ fraser_remove(sl_intset_t *set, skey_t key)
   for (i = curr->toplevel-1; i >= 0; i--) 
     {
 nextlevel:
-      toplevel = curr->toplevel;
       TSX_CRITICAL_SECTION
         {
           if (i < curr->toplevel)
             {
-              if (/*preds[i]->deleted*/ || preds[i]->next[i] != curr)
+              if (/*preds[i]->deleted ||*/ preds[i]->next[i] != curr)
                 {
                   TSX_ABORT;
                 }

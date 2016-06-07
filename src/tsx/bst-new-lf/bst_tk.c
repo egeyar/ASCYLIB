@@ -140,7 +140,7 @@ retry:
 
 
 #define NEW_DELETE(branchx, branchy, branchnoty)                       \
-sibling = pred->branchnoty;                                            \
+sibling = (node_t *) pred->branchnoty;                                 \
 node_t *leftchild  = right ? sibling : curr,                           \
        *rightchild = right ? curr : sibling;                           \
 if (unlikely(pred==set->head || sibling == set->head                   \

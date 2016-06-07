@@ -126,7 +126,7 @@ retry:
   MEM_BARRIER;
 #endif	/* __tile__ */
 
-  node_t **pred_next = (right ? &pred->right : &pred->left);
+  node_t **pred_next = (node_t **) (right ? &pred->right : &pred->left);
 
   TSX_WITH_FALLBACK_BEGIN();
   TSX_PROTECT_NODE(pred, retry);

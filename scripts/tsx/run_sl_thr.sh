@@ -15,7 +15,8 @@ else
 . ./scripts/tsx/run.config;
 fi;
 
-algos=( ${ub}/lb-sl_herlihy ${ub}/tsx-sl_herlihy ${ub}/lf-sl_fraser ${ub}/tsx-sl_fraser_cas ${ub}/tsx-sl_fraser_tsx ${ub}/lb-sl_pugh ${ub}/tsx-sl_pugh );
+#algos=( ${ub}/lb-sl_herlihy ${ub}/lf-sl_fraser ${ub}/tsx-sl_fraser_tsx ${ub}/lb-sl_pugh ${ub}/lf-sl_new ${ub}/tsx-sl_new_half ${ub}/tsx-sl_new_full );
+algos=( ${ub}/lb-sl_herlihy ${ub}/lf-sl_fraser ${ub}/lb-sl_pugh ${ub}/tsx-sl_generic ${ub}/lf-sl_generic ${ub}/lf-sl_new ${ub}/tsx-sl_new_full );
 
 params_i=( 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 1024 16384 65536 );
 params_u=( 80   80    80    60   60    60    40   40    40    20   20    20    10   10    10    );
